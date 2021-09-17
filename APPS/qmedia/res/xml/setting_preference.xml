@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+~ Copyright (c) 2021 The Linux Foundation. All rights reserved.
+~
+~ Redistribution and use in source and binary forms, with or without
+~ modification, are permitted provided that the following conditions are
+~ met:
+~     * Redistributions of source code must retain the above copyright
+~       notice, this list of conditions and the following disclaimer.
+~     * Redistributions in binary form must reproduce the above
+~       copyright notice, this list of conditions and the following
+~       disclaimer in the documentation and/or other materials provided
+~       with the distribution.
+~     * Neither the name of The Linux Foundation nor the names of its
+~       contributors may be used to endorse or promote products derived
+~       from this software without specific prior written permission.
+~
+~ THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+~ WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+~ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+~ ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+~ BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+~ CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+~ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+~ BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+~ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+~ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+~ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <PreferenceCategory android:title="Concurrent HDMI">
+        <androidx.preference.SwitchPreference
+            android:defaultValue="true"
+            android:key="hdmi_enable"
+            android:summary="Enable"
+            android:title="Enable" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="MP4"
+            android:entries="@array/input_source"
+            android:entryValues="@array/input_source"
+            android:key="primary_hdmi"
+            android:summary="%s"
+            android:title="Source" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="MP4"
+            android:entries="@array/input_source"
+            android:entryValues="@array/input_source"
+            android:key="second_hdmi"
+            android:summary="%s"
+            android:title="Source" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="MP4"
+            android:entries="@array/input_source"
+            android:entryValues="@array/input_source"
+            android:key="third_hdmi"
+            android:summary="%s"
+            android:title="Source" />
+
+    </PreferenceCategory>
+
+
+    <PreferenceCategory android:title="Concurrent Decode">
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="concurrent_decode_enable"
+            android:summary="Enable"
+            android:title="Enable" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="1"
+            android:entries="@array/decode_instance"
+            android:entryValues="@array/decode_instance"
+            android:key="decode_instance"
+            android:summary="%s"
+            android:title="Decoder Instance" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="SF"
+            android:entries="@array/compose_view_type"
+            android:entryValues="@array/compose_view_type"
+            android:key="compose_view"
+            android:summary="%s"
+            android:title="Compose Type" />
+
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="HDMI In">
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_in_enable"
+            android:summary="Enable"
+            android:title="Enable" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Version">
+        <androidx.preference.EditTextPreference
+            android:key="version_info"
+            android:summary="" />
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

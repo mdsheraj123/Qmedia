@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
 ~ Copyright (c) 2021 The Linux Foundation. All rights reserved.
 ~
 ~ Redistribution and use in source and binary forms, with or without
@@ -31,52 +30,21 @@
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-    <PreferenceCategory android:title="Concurrent HDMI">
-        <androidx.preference.SwitchPreference
-            android:defaultValue="true"
-            android:key="hdmi_enable"
-            android:summary="Enable"
-            android:title="Enable" />
+    <PreferenceCategory android:title="HDMI Out Primary">
 
         <androidx.preference.ListPreference
-            android:defaultValue="MP4"
+            android:defaultValue="None"
             android:entries="@array/input_source"
             android:entryValues="@array/input_source"
-            android:key="primary_hdmi"
+            android:key="hdmi_1_source"
             android:summary="%s"
             android:title="Source" />
-
-        <androidx.preference.ListPreference
-            android:defaultValue="MP4"
-            android:entries="@array/input_source"
-            android:entryValues="@array/input_source"
-            android:key="second_hdmi"
-            android:summary="%s"
-            android:title="Source" />
-
-        <androidx.preference.ListPreference
-            android:defaultValue="MP4"
-            android:entries="@array/input_source"
-            android:entryValues="@array/input_source"
-            android:key="third_hdmi"
-            android:summary="%s"
-            android:title="Source" />
-
-    </PreferenceCategory>
-
-
-    <PreferenceCategory android:title="Concurrent Decode">
-        <androidx.preference.SwitchPreference
-            android:defaultValue="false"
-            android:key="concurrent_decode_enable"
-            android:summary="Enable"
-            android:title="Enable" />
 
         <androidx.preference.ListPreference
             android:defaultValue="1"
             android:entries="@array/decode_instance"
             android:entryValues="@array/decode_instance"
-            android:key="decode_instance"
+            android:key="hdmi_1_decoder_instance"
             android:summary="%s"
             android:title="Decoder Instance" />
 
@@ -84,19 +52,89 @@
             android:defaultValue="SF"
             android:entries="@array/compose_view_type"
             android:entryValues="@array/compose_view_type"
-            android:key="compose_view"
+            android:key="hdmi_1_compose_view"
             android:summary="%s"
             android:title="Compose Type" />
 
+        <androidx.preference.ListPreference
+            android:defaultValue="0"
+            android:entries="@array/camera_ids"
+            android:entryValues="@array/camera_ids"
+            android:key="hdmi_1_camera_id"
+            android:summary="%s"
+            android:title="Camera ID" />
 
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="HDMI In">
-        <androidx.preference.SwitchPreference
-            android:defaultValue="false"
-            android:key="hdmi_in_enable"
-            android:summary="Enable"
-            android:title="Enable" />
+    <PreferenceCategory android:title="HDMI Out 2">
+
+        <androidx.preference.ListPreference
+            android:defaultValue="None"
+            android:entries="@array/input_source"
+            android:entryValues="@array/input_source"
+            android:key="hdmi_2_source"
+            android:summary="%s"
+            android:title="Source" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="1"
+            android:entries="@array/decode_instance"
+            android:entryValues="@array/decode_instance"
+            android:key="hdmi_2_decoder_instance"
+            android:summary="%s"
+            android:title="Decoder Instance" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="SF"
+            android:entries="@array/compose_view_type"
+            android:entryValues="@array/compose_view_type"
+            android:key="hdmi_2_compose_view"
+            android:summary="%s"
+            android:title="Compose Type" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="0"
+            android:entries="@array/camera_ids"
+            android:entryValues="@array/camera_ids"
+            android:key="hdmi_2_camera_id"
+            android:summary="%s"
+            android:title="Camera ID" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="HDMI Out 3">
+
+        <androidx.preference.ListPreference
+            android:defaultValue="None"
+            android:entries="@array/input_source"
+            android:entryValues="@array/input_source"
+            android:key="hdmi_3_source"
+            android:summary="%s"
+            android:title="Source" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="1"
+            android:entries="@array/decode_instance"
+            android:entryValues="@array/decode_instance"
+            android:key="hdmi_3_decoder_instance"
+            android:summary="%s"
+            android:title="Decoder Instance" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="SF"
+            android:entries="@array/compose_view_type"
+            android:entryValues="@array/compose_view_type"
+            android:key="hdmi_3_compose_view"
+            android:summary="%s"
+            android:title="Compose Type" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="0"
+            android:entries="@array/camera_ids"
+            android:entryValues="@array/camera_ids"
+            android:key="hdmi_3_camera_id"
+            android:summary="%s"
+            android:title="Camera ID" />
 
     </PreferenceCategory>
 

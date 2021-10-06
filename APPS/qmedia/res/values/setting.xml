@@ -48,4 +48,8 @@
         <item>OpenGLESWithEncode</item>
     </string-array>
 
+    <string-array name="camera_ids">
+        <item>0</item>>
+    </string-array>
+
 </resources>

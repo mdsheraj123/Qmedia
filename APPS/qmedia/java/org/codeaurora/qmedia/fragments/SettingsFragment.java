@@ -29,18 +29,23 @@
 
 package org.codeaurora.qmedia.fragments;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Toast;
 
 import androidx.preference.EditTextPreference;
+import androidx.preference.ListPreference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceScreen;
-import androidx.preference.SwitchPreference;
 
 import org.codeaurora.qmedia.R;
+
+import java.util.ArrayList;
 
 public class SettingsFragment extends PreferenceFragmentCompat
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -61,6 +66,10 @@ public class SettingsFragment extends PreferenceFragmentCompat
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
+        // Populate camera IDs
+        populateCameraIDs();
+        // Update Preference
+        updatePreference();
     }
 
     @Override
@@ -88,40 +97,159 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        updatePreference();
+    }
 
-        SwitchPreference hdmi = (SwitchPreference) mPrefScreen.findPreference("hdmi_enable");
-        SwitchPreference decode =
-                (SwitchPreference) mPrefScreen.findPreference("concurrent_decode_enable");
-        SwitchPreference hdmi_in = (SwitchPreference) mPrefScreen.findPreference("hdmi_in_enable");
+    void updatePreference() {
+        ListPreference hdmi_source = (ListPreference) mPrefScreen.findPreference("hdmi_1_source");
+        ListPreference decoder_instance =
+                (ListPreference) mPrefScreen.findPreference("hdmi_1_decoder_instance");
+        ListPreference compose_view =
+                (ListPreference) mPrefScreen.findPreference("hdmi_1_compose_view");
+        ListPreference camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_1_camera_id");
 
-        switch (key) {
-            case "hdmi_enable": {
-                boolean checked = hdmi.isChecked();
-                if (checked) {
-                    decode.setChecked(false);
-                    hdmi_in.setChecked(false);
-                }
+        if (hdmi_source.getValue().equals("MP4")) {
+            if (!decoder_instance.isVisible()) {
+                decoder_instance.setVisible(true);
             }
-            case "concurrent_decode_enable": {
-                boolean checked = decode.isChecked();
-                if (checked) {
-                    hdmi.setChecked(false);
-                    hdmi_in.setChecked(false);
-                }
+            if (!compose_view.isVisible()) {
+                compose_view.setVisible(true);
             }
-            case "hdmi_in_enable": {
-                boolean checked = hdmi_in.isChecked();
-                if (checked) {
-                    decode.setChecked(false);
-                    hdmi.setChecked(false);
-                }
+            if (camera_id.isVisible()) {
+                camera_id.setVisible(false);
             }
-
+        } else if (hdmi_source.getValue().equals("Camera")) {
+            if (decoder_instance.isVisible()) {
+                decoder_instance.setVisible(false);
+            }
+            if (compose_view.isVisible()) {
+                compose_view.setVisible(false);
+            }
+            if (!camera_id.isVisible()) {
+                camera_id.setVisible(true);
+            }
+        } else {
+            decoder_instance.setVisible(false);
+            compose_view.setVisible(false);
+            camera_id.setVisible(false);
         }
 
-        if (!(hdmi.isChecked() || decode.isChecked() || hdmi_in.isChecked())) {
-            Toast.makeText(getContext().getApplicationContext(),
-                    "Please select at least one functionality", Toast.LENGTH_SHORT).show();
+        hdmi_source = (ListPreference) mPrefScreen.findPreference("hdmi_2_source");
+        decoder_instance =
+                (ListPreference) mPrefScreen.findPreference("hdmi_2_decoder_instance");
+        compose_view =
+                (ListPreference) mPrefScreen.findPreference("hdmi_2_compose_view");
+        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_2_camera_id");
+
+        if (hdmi_source.getValue().equals("MP4")) {
+            if (!decoder_instance.isVisible()) {
+                decoder_instance.setVisible(true);
+            }
+            if (!compose_view.isVisible()) {
+                compose_view.setVisible(true);
+            }
+            if (camera_id.isVisible()) {
+                camera_id.setVisible(false);
+            }
+        } else if (hdmi_source.getValue().equals("Camera")) {
+            if (decoder_instance.isVisible()) {
+                decoder_instance.setVisible(false);
+            }
+            if (compose_view.isVisible()) {
+                compose_view.setVisible(false);
+            }
+            if (!camera_id.isVisible()) {
+                camera_id.setVisible(true);
+            }
+        } else {
+            decoder_instance.setVisible(false);
+            compose_view.setVisible(false);
+            camera_id.setVisible(false);
         }
+
+        hdmi_source = (ListPreference) mPrefScreen.findPreference("hdmi_3_source");
+        decoder_instance =
+                (ListPreference) mPrefScreen.findPreference("hdmi_3_decoder_instance");
+        compose_view =
+                (ListPreference) mPrefScreen.findPreference("hdmi_3_compose_view");
+        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_3_camera_id");
+
+        if (hdmi_source.getValue().equals("MP4")) {
+            if (!decoder_instance.isVisible()) {
+                decoder_instance.setVisible(true);
+            }
+            if (!compose_view.isVisible()) {
+                compose_view.setVisible(true);
+            }
+            if (camera_id.isVisible()) {
+                camera_id.setVisible(false);
+            }
+        } else if (hdmi_source.getValue().equals("Camera")) {
+            if (decoder_instance.isVisible()) {
+                decoder_instance.setVisible(false);
+            }
+            if (compose_view.isVisible()) {
+                compose_view.setVisible(false);
+            }
+            if (!camera_id.isVisible()) {
+                camera_id.setVisible(true);
+            }
+        } else {
+            decoder_instance.setVisible(false);
+            compose_view.setVisible(false);
+            camera_id.setVisible(false);
+        }
+    }
+
+    String getLensOrientationString (int facing) {
+        String out = "Unknown";
+        switch (facing) {
+            case CameraCharacteristics.LENS_FACING_BACK:
+                out  = "Back";
+                break;
+            case CameraCharacteristics.LENS_FACING_FRONT:
+                out  = "Front";
+                break;
+            case CameraCharacteristics.LENS_FACING_EXTERNAL:
+                out  = "External";
+                break;
+        }
+        return out;
+    }
+
+    void populateCameraIDs() {
+        CameraManager cameraManager =
+                (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
+        ArrayList<String> detectedCameras = new ArrayList<>();
+        ArrayList<String> cameraIDs = new ArrayList<>();
+        try {
+            for (String camID : cameraManager.getCameraIdList()) {
+                detectedCameras.add(getLensOrientationString(
+                        cameraManager.getCameraCharacteristics(camID)
+                                .get(CameraCharacteristics.LENS_FACING)) + "(" + camID + ")");
+                cameraIDs.add(camID);
+            }
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
+        ListPreference camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_1_camera_id");
+        CharSequence[] cameras = detectedCameras.toArray(new CharSequence[detectedCameras.size()]);
+        CharSequence[] cameraIds =
+                cameraIDs.toArray(new CharSequence[cameraIDs.size()]);
+        camera_id.setEntries(cameras);
+        camera_id.setEntryValues(cameraIds);
+        camera_id.setValueIndex(0);
+
+        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_2_camera_id");
+        camera_id.setEntries(cameras);
+        camera_id.setEntryValues(cameraIds);
+        camera_id.setValueIndex(0);
+
+        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_3_camera_id");
+        camera_id.setEntries(cameras);
+        camera_id.setEntryValues(cameraIds);
+        camera_id.setValueIndex(0);
+
     }
 }

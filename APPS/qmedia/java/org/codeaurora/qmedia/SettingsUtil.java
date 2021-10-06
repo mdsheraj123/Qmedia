@@ -39,73 +39,70 @@ import java.util.ArrayList;
 
 class SettingsData {
 
-    protected boolean concurrentHdmiEnable;
-    protected ArrayList<String> sources;
-
-    protected boolean decodeEnable;
+    protected String src;
     protected int decodeInstance;
     protected String composeType;
-
-    protected boolean hdmiInEnable;
+    protected String camID;
 }
 
 public class SettingsUtil {
 
     private static final String TAG = "SettingsUtil";
 
-    public SettingsData data;
+    public ArrayList<SettingsData> data;
 
     public SettingsUtil(Context context) {
-        data = new SettingsData();
-
+        data = new ArrayList<>();
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(context);
 
-        data.concurrentHdmiEnable = pref.getBoolean("hdmi_enable", true);
-        data.sources = new ArrayList<>();
-        data.sources.add(pref.getString("primary_hdmi", "MP4"));
-        data.sources.add(pref.getString("second_hdmi", "MP4"));
-        data.sources.add(pref.getString("third_hdmi", "MP4"));
+        SettingsData hdmi_1_setting = new SettingsData();
+        hdmi_1_setting.src = pref.getString("hdmi_1_source", "None");
+        hdmi_1_setting.decodeInstance =
+                Integer.parseInt(pref.getString("hdmi_1_decoder_instance", "1"));
+        hdmi_1_setting.composeType = pref.getString("hdmi_1_compose_view", "SF");
+        hdmi_1_setting.camID = pref.getString("hdmi_1_camera_id", "0");
+        data.add(hdmi_1_setting);
 
-        data.decodeEnable = pref.getBoolean("concurrent_decode_enable", false);
-        data.decodeInstance = Integer.parseInt(pref.getString("decode_instance", "1"));
-        data.composeType = pref.getString("compose_view", "SF");
+        SettingsData hdmi_2_setting = new SettingsData();
+        hdmi_2_setting.src = pref.getString("hdmi_2_source", "None");
+        hdmi_2_setting.decodeInstance =
+                Integer.parseInt(pref.getString("hdmi_2_decoder_instance", "1"));
+        hdmi_2_setting.composeType = pref.getString("hdmi_2_compose_view", "SF");
+        hdmi_2_setting.camID = pref.getString("hdmi_2_camera_id", "0");
+        data.add(hdmi_2_setting);
 
-        data.hdmiInEnable = pref.getBoolean("hdmi_in_enable", false);
+        SettingsData hdmi_3_setting = new SettingsData();
+        hdmi_3_setting.src = pref.getString("hdmi_3_source", "None");
+        hdmi_3_setting.decodeInstance =
+                Integer.parseInt(pref.getString("hdmi_3_decoder_instance", "1"));
+        hdmi_3_setting.composeType = pref.getString("hdmi_3_compose_view", "SF");
+        hdmi_3_setting.camID = pref.getString("hdmi_3_camera_id", "0");
+        data.add(hdmi_3_setting);
     }
 
     public void printSettingsValues() {
-        Log.d(TAG, "Concurrent HDMI : " + data.concurrentHdmiEnable + "\n");
-        Log.d(TAG, "Size of sources" + data.sources.size());
-        for (int it = 0; it < data.sources.size(); it++) {
-            Log.d(TAG, "Source# " + it + ": " + data.sources.get(it));
+        for (int it = 0; it < data.size(); it++) {
+            Log.d(TAG, "Source " + it + ":" + data.get(it).src);
+            Log.d(TAG, "Decoder Instance : " + data.get(it).decodeInstance);
+            Log.d(TAG, "Compose Type : " + data.get(it).composeType);
+            Log.d(TAG, "Camera ID : " + data.get(it).camID);
+            Log.d(TAG, "#####################################");
         }
-        Log.d(TAG, "Concurrent Decode : " + data.decodeEnable + "\n");
-        Log.d(TAG, "Decode Instance : " + data.decodeInstance + "\n");
-        Log.d(TAG, "Compose and View Type : " + data.composeType + "\n");
-        Log.d(TAG, "HDMI In : " + data.hdmiInEnable + "\n");
     }
 
-    public boolean getDecodeStatus() {
-        return data.decodeEnable;
+    public String getHDMISource(int index) {
+        return data.get(index).src;
     }
 
-    public int getDecodeInstance() {
-        return data.decodeInstance;
+    public int getDecoderInstanceNumber(int index) {
+        return data.get(index).decodeInstance;
     }
 
-    public String getComposeType() {
-        return data.composeType;
+    public String getComposeType(int index) {
+        return data.get(index).composeType;
     }
 
-    public boolean getConcurrentHDMIStatus() {
-        return data.concurrentHdmiEnable;
-    }
-
-    public ArrayList<String> getConcurrentHDMISource() {
-        return data.sources;
-    }
-
-    public boolean getHDMIInStatus() {
-        return data.hdmiInEnable;
+    public String getCameraID(int index) {
+        return data.get(index).camID;
     }
 }

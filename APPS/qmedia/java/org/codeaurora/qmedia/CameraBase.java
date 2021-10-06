@@ -138,7 +138,7 @@ public class CameraBase {
     }
 
     public void closeCamera() {
-        Log.i(TAG, "Closing Camera ID" + mCameraDevice.getId());
+        Log.i(TAG, "Closing Camera ID # " + mCameraDevice.getId());
 
         // Clear the surface
         mStreamSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);

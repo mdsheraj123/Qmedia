@@ -36,63 +36,268 @@ import android.util.Log;
 import android.view.Display;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
+
+import org.codeaurora.qmedia.opengles.VideoComposer;
+
+import java.io.File;
+import java.util.ArrayList;
 
 
 public class PresentationBase extends Presentation {
 
     private static final String TAG = "PresentationBase";
+    private static final String FILES_PATH = "/storage/emulated/0/DCIM/Test";
+    private final ArrayList<MediaCodecDecoder> mMediaCodecDecoderList = new ArrayList<>();
+    private final ArrayList<SurfaceView> mSurfaceViewList = new ArrayList<>();
+    private SurfaceView mSurfaceView;
+    private CameraBase mCameraBase = null;
+    private final SettingsUtil mData;
+    private final int mPresentationIndex;
+    private Button mSecondaryDisplayBtn;
+    private MediaCodecRecorder mMediaCodecRecorder = null;
+    private VideoComposer mVideoComposer = null;
+    private ArrayList<String> mFileNames;
+    private int mSurfaceCount = 0;
 
-    SurfaceView mSurfaceView;
-    MediaCodecDecoder mMediaCodecDecoder = null;
-    CameraBase mCameraBase = null;
-    String mData;
-
-    public PresentationBase(Context outerContext, Display display, String data) {
+    public PresentationBase(Context outerContext, Display display, SettingsUtil data, int index) {
         super(outerContext, display);
         this.mData = data;
+        this.mPresentationIndex = index;
     }
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Set the content view to the custom layout
-        setContentView(R.layout.secondary_display);
-
-        mSurfaceView = findViewById(R.id.secondary_surface_view);
-        mSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
-            public void surfaceCreated(SurfaceHolder holder) {
-                if (mData.equals("0") || mData.equals("1") || mData.equals("2")) {
-                    // This is camera use case
-                    mCameraBase = new CameraBase(getContext());
-                    mCameraBase.addPreviewStream(holder);
-                } else {
-                    mMediaCodecDecoder = new MediaCodecDecoder(holder, holder.getSurface(), mData);
+        // This code is to handle Concurrent Decode functionality
+        if (mData.getHDMISource(mPresentationIndex).equals("MP4")) {
+            if (mData.getComposeType(mPresentationIndex).equals("OpenGLES")) {
+                setContentView(R.layout.opengl_composition);
+            } else if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode")) {
+                setContentView(R.layout.opengles_with_encode);
+            } else {
+                switch (mData.getDecoderInstanceNumber(mPresentationIndex)) {
+                    case 1:
+                        setContentView(R.layout.decode_one);
+                        break;
+                    case 4:
+                        setContentView(R.layout.decode_four);
+                        break;
+                    case 8:
+                        setContentView(R.layout.decode_eight);
+                        break;
+                    case 15:
+                        setContentView(R.layout.decode_fifteen);
+                        break;
+                    case 24:
+                        setContentView(R.layout.decode_max);
+                        break;
+                    default:
+                        Log.e(TAG, "Invalid decode configuration");
                 }
             }
+            mSecondaryDisplayBtn = findViewById(R.id.button_decode);
+            mSecondaryDisplayBtn.setVisibility(View.INVISIBLE);
+            loadFileNames();
+        } else {
+            // Load Default layout for Camera
+            setContentView(R.layout.secondary_display);
+        }
+        if (mData.getHDMISource(mPresentationIndex).equals("Camera")) {
+            mSurfaceView = findViewById(R.id.secondary_surface_view);
+            mSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+                public void surfaceCreated(SurfaceHolder holder) {
+                    mCameraBase = new CameraBase(getContext());
+                    mCameraBase.addPreviewStream(holder);
+                }
 
-            @Override
-            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-            }
+                @Override
+                public void surfaceChanged(SurfaceHolder holder, int format, int width,
+                                           int height) {
+                }
 
-            @Override
-            public void surfaceDestroyed(SurfaceHolder holder) {
+                @Override
+                public void surfaceDestroyed(SurfaceHolder holder) {
+                }
+            });
+        } else if (mData.getHDMISource(mPresentationIndex).equals("MP4")) {
+            if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode")) {
+                Log.i(TAG, "OpenGLES with Encode is selected");
+                mMediaCodecRecorder = new MediaCodecRecorder(getContext(), 1920, 1080, false);
+                createMediaCodecDecoderInstances();
+            } else {
+                createSurfaceView();
             }
-        });
+        }
     }
 
     public void start() {
         Log.d(TAG, "Starting secondary display");
-        if (mMediaCodecDecoder != null)
-            mMediaCodecDecoder.start();
-        if (mCameraBase != null)
-            mCameraBase.startCamera(mData);
+        if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode") &&
+                mMediaCodecRecorder != null) {
+            mMediaCodecRecorder.start(0);
+        }
+        for (MediaCodecDecoder it : mMediaCodecDecoderList) {
+            it.start();
+        }
+        if (mCameraBase != null) {
+            mCameraBase.startCamera(mData.getCameraID(mPresentationIndex));
+        }
     }
 
     public void stop() {
         Log.d(TAG, "Stopping secondary display");
-        if (mMediaCodecDecoder != null)
-            mMediaCodecDecoder.stop();
-        if (mCameraBase != null)
+        if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode") &&
+                mMediaCodecRecorder != null) {
+            mMediaCodecRecorder.stop();
+        }
+        for (MediaCodecDecoder it : mMediaCodecDecoderList) {
+            it.stop();
+        }
+        if (mCameraBase != null) {
             mCameraBase.closeCamera();
+        }
+    }
+
+    private void createMediaCodecDecoderInstances() {
+        int count = 0;
+        if (mData.getComposeType(mPresentationIndex).equals("SF")) {
+            for (SurfaceView it : mSurfaceViewList) {
+                mMediaCodecDecoderList.add(new MediaCodecDecoder(it.getHolder(),
+                        it.getHolder().getSurface(),
+                        mFileNames.get(count % mFileNames.size())));
+                count++;
+            }
+        } else {
+            if (mData.getComposeType(mPresentationIndex).equals("OpenGLES")) {
+                mVideoComposer = new VideoComposer(mSurfaceViewList.get(0).getHolder().getSurface(),
+                        1280, 720, 30f, 0.0f, mData.getDecoderInstanceNumber(mPresentationIndex));
+            } else { // This is OPENGL With Encode
+                mVideoComposer = new VideoComposer(mMediaCodecRecorder.getRecorderSurface(), 1920,
+                        1080, 30.0f, 0.0f, mData.getDecoderInstanceNumber(mPresentationIndex));
+            }
+            for (int it = 0; it < mData.getDecoderInstanceNumber(mPresentationIndex); it++) {
+                mMediaCodecDecoderList.add(new MediaCodecDecoder(null,
+                        mVideoComposer.getInputSurface(it),
+                        mFileNames.get(count % mFileNames.size())));
+                count++;
+            }
+        }
+    }
+
+    private void loadFileNames() {
+        mFileNames = new ArrayList<>();
+        try {
+            File[] files = new File(FILES_PATH).listFiles();
+            for (File file : files) {
+                if (file.isFile()) {
+                    Log.d(TAG, "File Names: " + file.getAbsolutePath());
+                    mFileNames.add(file.getAbsolutePath());
+                }
+            }
+        } catch (NullPointerException e) {
+            Toast.makeText(getContext(), "Please provide the correct path for video files",
+                    Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+        }
+    }
+
+    private void createSurfaceView() {
+        if (mData.getComposeType(mPresentationIndex).equals("OpenGLES")) {
+            mSurfaceViewList.add(findViewById(R.id.primary_surface_view));
+        } else {
+            switch (mData.getDecoderInstanceNumber(mPresentationIndex)) {
+                case 1:
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView0));
+                    break;
+                case 4:
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView0));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView1));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView2));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView3));
+                    break;
+                case 8:
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView0));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView1));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView2));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView3));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView4));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView5));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView6));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView7));
+                    break;
+                case 15:
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView0));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView1));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView2));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView3));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView4));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView5));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView6));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView7));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView8));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView9));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView10));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView11));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView12));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView13));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView14));
+                    break;
+                case 24:
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView0));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView1));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView2));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView3));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView4));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView5));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView6));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView7));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView8));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView9));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView10));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView11));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView12));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView13));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView14));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView15));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView16));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView17));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView18));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView19));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView20));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView21));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView22));
+                    mSurfaceViewList.add(findViewById(R.id.surfaceView23));
+                    break;
+            }
+        }
+
+        for (SurfaceView surface : mSurfaceViewList) {
+            surface.getHolder().addCallback(new SurfaceHolder.Callback() {
+                @Override
+                public void surfaceCreated(SurfaceHolder holder) {
+                    updateSurfaceCreatedCount();
+                }
+
+                @Override
+                public void surfaceChanged(SurfaceHolder holder, int format, int width,
+                                           int height) {
+                }
+
+                @Override
+                public void surfaceDestroyed(SurfaceHolder holder) {
+                }
+            });
+        }
+    }
+
+    private void updateSurfaceCreatedCount() {
+        mSurfaceCount++;
+        if (mSurfaceCount == mSurfaceViewList.size()) {
+            createMediaCodecDecoderInstances();
+        }
     }
 }
 

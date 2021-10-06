@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
         PermissionFragment permissionFrag = new PermissionFragment();
         if (permissionFrag.hasPermissions(getApplicationContext())) {
             if (PreferenceManager.getDefaultSharedPreferences(this)
-                    .getBoolean("hdmi_enable", false) == false) {
+                    .getString("hdmi_1_source", "None").equals("None")) {
                 executeTransaction(1);
             }
             executeTransaction(0);

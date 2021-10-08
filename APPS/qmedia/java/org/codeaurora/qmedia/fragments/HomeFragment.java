@@ -46,6 +46,7 @@ import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 
 import org.codeaurora.qmedia.CameraBase;
+import org.codeaurora.qmedia.HDMIinAudioPlayback;
 import org.codeaurora.qmedia.MediaCodecDecoder;
 import org.codeaurora.qmedia.MediaCodecRecorder;
 import org.codeaurora.qmedia.PresentationBase;
@@ -76,6 +77,8 @@ public class HomeFragment extends Fragment {
     private CameraBase mCameraBase = null;
     private MediaCodecRecorder mMediaCodecRecorder = null;
     private Boolean mRecorderStarted = false;
+
+    private HDMIinAudioPlayback mHDMIinAudioPlayback = null;
 
     public HomeFragment() {
     }
@@ -192,6 +195,16 @@ public class HomeFragment extends Fragment {
                 it.dismiss();
             }
 
+            if (mSettingData.getCameraID(0).equals("3")) {
+                if (mMediaCodecRecorder != null && mRecorderStarted) {
+                    mMediaCodecRecorder.stop();
+                    mRecorderStarted = false;
+                }
+                if(mHDMIinAudioPlayback!= null) {
+                    mHDMIinAudioPlayback.stop();
+                    mHDMIinAudioPlayback = null;
+                }
+            }
             // This will handle primary screen camera op
             if (mCameraBase != null) {
                 mCameraBase.closeCamera();
@@ -238,11 +251,26 @@ public class HomeFragment extends Fragment {
         if (mCameraBase != null) {
             if (mPrimaryDisplayStarted) {
                 mCameraBase.startCamera(mSettingData.getCameraID(0));
+                if (mSettingData.getCameraID(0).equals("3")) {
+                    mMediaCodecRecorder.start(0);
+                    mRecorderStarted = true;
+                    mHDMIinAudioPlayback.start();
+                }
                 for (PresentationBase it : mPresentationBaseList) {
                     it.start();
                 }
                 mPrimaryDisplayButton.setText("Stop");
             } else {
+
+                if (mSettingData.getCameraID(0).equals("3")) {
+                    if (mMediaCodecRecorder != null && mRecorderStarted) {
+                        mMediaCodecRecorder.stop();
+                        mRecorderStarted = false;
+                    }
+                    if(mHDMIinAudioPlayback!= null) {
+                        mHDMIinAudioPlayback.stop();
+                    }
+                }
                 mCameraBase.closeCamera();
                 for (PresentationBase it : mPresentationBaseList) {
                     it.stop();
@@ -258,6 +286,10 @@ public class HomeFragment extends Fragment {
         mPrimaryDisplayButton.setOnClickListener((View v) -> {
             processCameraOperation();
         });
+        if (mSettingData.getCameraID(0).equals("3")) {
+            mMediaCodecRecorder = new MediaCodecRecorder(getContext(), 3840, 2160, true);
+            mHDMIinAudioPlayback = new HDMIinAudioPlayback(getContext());
+        }
         mPrimaryDisplaySurfaceView = view.findViewById(R.id.primary_surface_view);
         mPrimaryDisplaySurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
@@ -266,6 +298,9 @@ public class HomeFragment extends Fragment {
                 holder.setFixedSize(1920, 1080);
                 mCameraBase = new CameraBase(getContext());
                 mCameraBase.addPreviewStream(holder);
+                if (mSettingData.getCameraID(0).equals("3")) {
+                    mCameraBase.addRecorderStream(mMediaCodecRecorder.getRecorderSurface());
+                }
             }
 
             @Override

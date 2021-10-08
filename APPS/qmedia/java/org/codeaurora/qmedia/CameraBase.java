@@ -29,6 +29,7 @@
 
 package org.codeaurora.qmedia;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.hardware.camera2.CameraAccessException;
@@ -45,7 +46,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -62,6 +65,11 @@ public class CameraBase {
     private CaptureRequest.Builder mPreviewRequestBuilder;
     private SurfaceHolder mStreamSurfaceHolder;
     private Surface mRecordSurface;
+    private Boolean mRecord = false;
+
+    public CameraBase(Context context) {
+        mCameraContext = context;
+    }
 
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
@@ -98,10 +106,6 @@ public class CameraBase {
         }
     };
 
-    public CameraBase(Context context) {
-        mCameraContext = context;
-    }
-
     private void startBackgroundThread() {
         mBackgroundThread = new HandlerThread("Camera2BackgroundThread");
         mBackgroundThread.start();
@@ -119,6 +123,7 @@ public class CameraBase {
         }
     }
 
+    @SuppressLint("MissingPermission")
     public void startCamera(String id) {
 
         Log.i(TAG, "Opening Camera ID" + id);
@@ -138,11 +143,15 @@ public class CameraBase {
     }
 
     public void closeCamera() {
-        Log.i(TAG, "Closing Camera ID # " + mCameraDevice.getId());
+        if (mCameraDevice != null) {
+            Log.i(TAG, "Closing Camera ID # " + mCameraDevice.getId());
+        }
 
         // Clear the surface
-        mStreamSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
-        mStreamSurfaceHolder.setFormat(PixelFormat.OPAQUE);
+        if (mStreamSurfaceHolder != null) {
+            mStreamSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
+            mStreamSurfaceHolder.setFormat(PixelFormat.OPAQUE);
+        }
 
         try {
             mCameraOpenCloseLock.acquire();
@@ -171,11 +180,17 @@ public class CameraBase {
         try {
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            List<Surface> outputs = new ArrayList<Surface>();
             mPreviewRequestBuilder.addTarget(mStreamSurfaceHolder.getSurface());
+            outputs.add(mStreamSurfaceHolder.getSurface());
+
+            if (mRecord && mRecordSurface != null) {
+                mPreviewRequestBuilder.addTarget(mRecordSurface);
+                outputs.add(mRecordSurface);
+            }
 
             // Here, we create a CameraCaptureSession for camera preview.
-            mCameraDevice.createCaptureSession(
-                    Collections.singletonList(mStreamSurfaceHolder.getSurface()),
+            mCameraDevice.createCaptureSession(outputs,
                     new CameraCaptureSession.StateCallback() {
 
                         @Override
@@ -231,6 +246,7 @@ public class CameraBase {
 
     public void addRecorderStream(Surface recorderSurface) {
         mRecordSurface = recorderSurface;
+        mRecord = true;
     }
 }
 

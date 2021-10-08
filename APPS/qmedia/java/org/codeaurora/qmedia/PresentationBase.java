@@ -62,6 +62,8 @@ public class PresentationBase extends Presentation {
     private ArrayList<String> mFileNames;
     private int mSurfaceCount = 0;
 
+    private HDMIinAudioPlayback mHDMIinAudioPlayback = null;
+
     public PresentationBase(Context outerContext, Display display, SettingsUtil data, int index) {
         super(outerContext, display);
         this.mData = data;
@@ -111,6 +113,10 @@ public class PresentationBase extends Presentation {
                 public void surfaceCreated(SurfaceHolder holder) {
                     mCameraBase = new CameraBase(getContext());
                     mCameraBase.addPreviewStream(holder);
+                    if (mData.getCameraID(mPresentationIndex).equals("3")) {
+                        mMediaCodecRecorder = new MediaCodecRecorder(getContext(), 3840, 2160, true);
+                        mCameraBase.addRecorderStream(mMediaCodecRecorder.getRecorderSurface());
+                    }
                 }
 
                 @Override
@@ -122,6 +128,9 @@ public class PresentationBase extends Presentation {
                 public void surfaceDestroyed(SurfaceHolder holder) {
                 }
             });
+            if (mData.getCameraID(mPresentationIndex).equals("3")) {
+                mHDMIinAudioPlayback = new HDMIinAudioPlayback(getContext().getApplicationContext());
+            }
         } else if (mData.getHDMISource(mPresentationIndex).equals("MP4")) {
             if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode")) {
                 Log.i(TAG, "OpenGLES with Encode is selected");
@@ -145,6 +154,10 @@ public class PresentationBase extends Presentation {
         if (mCameraBase != null) {
             mCameraBase.startCamera(mData.getCameraID(mPresentationIndex));
         }
+        if (mData.getCameraID(mPresentationIndex).equals("3")) {
+            mHDMIinAudioPlayback.start();
+            mMediaCodecRecorder.start(0);
+        }
     }
 
     public void stop() {
@@ -155,6 +168,10 @@ public class PresentationBase extends Presentation {
         }
         for (MediaCodecDecoder it : mMediaCodecDecoderList) {
             it.stop();
+        }
+        if (mData.getCameraID(mPresentationIndex).equals("3")) {
+            mMediaCodecRecorder.stop();
+            mHDMIinAudioPlayback.stop();
         }
         if (mCameraBase != null) {
             mCameraBase.closeCamera();

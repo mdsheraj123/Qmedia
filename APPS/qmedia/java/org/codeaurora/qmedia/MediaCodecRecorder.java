@@ -31,7 +31,9 @@ package org.codeaurora.qmedia;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.AudioTimestamp;
 import android.media.MediaCodec;
@@ -51,17 +53,18 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MediaCodecRecorder {
     private static final long TIMEOUT_USEC = 10000L;
     private static final String TAG = "MediaCodecRecorder";
-    private static final int AUDIO_SAMPLE_RATE = 44100;
-    private static final int AUDIO_SAMPLES_PER_FRAME = 1024;
     private static final int AUDIO_BITRATE = 128000;
     private static final String AUDIO_MIME_TYPE = "audio/mp4a-latm";
+    private static final int DEFAULT_SAMPLE_RATE = 48000;
     private final Context mContext;
     private final Semaphore mMuxerLock = new Semaphore(1);
     volatile long mPresentationTimeUs = -1L;
@@ -76,15 +79,23 @@ public class MediaCodecRecorder {
     private int mMuxerTrackCount;
     private Thread mVideoEncoderThread;
     private boolean mIsFirstTime;
-    private final boolean mIsAudioEnabled;
-    private boolean mAudioEncoderRunning = false;
-    private boolean mAudioRecorderRunning = false;
+    private boolean mIsAudioEnabled;
+    AtomicBoolean mAudioEncoderRunning = new AtomicBoolean(false);
+    AtomicBoolean mAudioRecorderRunning = new AtomicBoolean(false);
     private int mAudioTrackIndex = -1;
     private AudioRecord mAudioRecord;
     private MediaFormat mAudioFormat;
     private MediaCodec mAudioEncoder;
     private Thread mAudioEncoderThread;
     private Thread mAudioRecorderThread;
+
+    AudioDeviceInfo mHDMIDevice;
+    AudioManager mAudioManager;
+    AudioDeviceInfo[] mAudioDeviceInfos;
+    private int mAudioBufferBytes;
+    private int mAudioSampleRate;
+    private int mRecorderChannels;
+    private int mRecorderAudioEncoding;
 
     public MediaCodecRecorder(Context context, int width, int height, boolean audio_enabled) {
         this.mContext = context;
@@ -135,22 +146,48 @@ public class MediaCodecRecorder {
         }
 
         if (mIsAudioEnabled) {
-            int minBufferSize = AudioRecord.getMinBufferSize(AUDIO_SAMPLE_RATE,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT);
 
-            int bufferSize = AUDIO_SAMPLES_PER_FRAME * 10;
-            if (bufferSize < minBufferSize) bufferSize =
-                    (minBufferSize / AUDIO_SAMPLES_PER_FRAME + 1) * AUDIO_SAMPLES_PER_FRAME * 2;
-            mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.CAMCORDER, AUDIO_SAMPLE_RATE
-                    , AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
-            mAudioFormat = new MediaFormat();
-            mAudioFormat.setString(MediaFormat.KEY_MIME, AUDIO_MIME_TYPE);
-            mAudioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE,
-                    MediaCodecInfo.CodecProfileLevel.AACObjectLC);
-            mAudioFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, AUDIO_SAMPLE_RATE);
-            mAudioFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
-            mAudioFormat.setInteger(MediaFormat.KEY_BIT_RATE, AUDIO_BITRATE);
+            mAudioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+            mAudioDeviceInfos = mAudioManager.getDevices(AudioManager.GET_DEVICES_INPUTS);
+            for (AudioDeviceInfo d : mAudioDeviceInfos) {
+                if (d.getType() == AudioDeviceInfo.TYPE_HDMI)
+                    mHDMIDevice = d;
+            }
+            if (mHDMIDevice == null) {
+                mIsAudioEnabled = false;
+            } else {
+                int[] sampleRates = mHDMIDevice.getSampleRates();
+                if (sampleRates.length == 0) {
+                    mAudioSampleRate = DEFAULT_SAMPLE_RATE;
+                } else {
+                    mAudioSampleRate = Arrays.stream(sampleRates).max().getAsInt();
+                }
+                mRecorderChannels = Arrays.stream(mHDMIDevice.getChannelMasks()).
+                        filter(it -> it == AudioFormat.CHANNEL_IN_STEREO || it == AudioFormat.CHANNEL_IN_MONO).
+                        findFirst().getAsInt();
+                mRecorderAudioEncoding = Arrays.stream(mHDMIDevice.getEncodings()).
+                        filter(it -> it == AudioFormat.ENCODING_PCM_16BIT || it == AudioFormat.ENCODING_PCM_FLOAT).
+                        findFirst().getAsInt();
+
+                mAudioBufferBytes = AudioRecord.getMinBufferSize(mAudioSampleRate,
+                        mRecorderChannels,
+                        mRecorderAudioEncoding);
+
+                mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.UNPROCESSED,
+                        mAudioSampleRate, mRecorderChannels,
+                        mRecorderAudioEncoding, mAudioBufferBytes);
+                mAudioRecord.setPreferredDevice(mHDMIDevice);
+
+                mAudioFormat = new MediaFormat();
+                mAudioFormat.setString(MediaFormat.KEY_MIME, AUDIO_MIME_TYPE);
+                mAudioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE,
+                        MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+                mAudioFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, mAudioSampleRate);
+                mAudioFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT,
+                        mRecorderChannels == AudioFormat.CHANNEL_IN_STEREO ? 2 : 1);
+                mAudioFormat.setInteger(MediaFormat.KEY_BIT_RATE, AUDIO_BITRATE);
+            }
+
         }
     }
 
@@ -189,7 +226,7 @@ public class MediaCodecRecorder {
     }
 
     private void releaseAudioEncoder() {
-        mAudioEncoderRunning = false;
+        mAudioEncoderRunning.set(false);
         mAudioEncoder.stop();
         mAudioEncoder.release();
     }
@@ -248,7 +285,7 @@ public class MediaCodecRecorder {
         }
 
         if (mIsAudioEnabled) {
-            mAudioRecorderRunning = false;
+            mAudioRecorderRunning.set(false);
             try {
                 mAudioEncoderThread.join();
                 mAudioRecorderThread.join();
@@ -347,7 +384,7 @@ public class MediaCodecRecorder {
                         }
                         encodedData.position(bufferInfo.offset);
                         encodedData.limit(bufferInfo.offset + bufferInfo.size);
-                        if(mIsAudioEnabled) {
+                        if (mIsAudioEnabled) {
                             while (mPresentationTimeUs == -1L) {
                             }
                             bufferInfo.presentationTimeUs = mPresentationTimeUs;
@@ -377,10 +414,10 @@ public class MediaCodecRecorder {
 
         //method where the thread execution will start
         public void run() {
-            mAudioEncoderRunning = true;
+            mAudioEncoderRunning.set(true);
             ByteBuffer[] encoderOutputBuffers = mAudioEncoder.getOutputBuffers();
             long oldTimeStampUs = 0;
-            while (mAudioEncoderRunning) {
+            while (mAudioEncoderRunning.get()) {
                 MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
                 int encoderStatus = mAudioEncoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
                 if (encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
@@ -439,16 +476,16 @@ public class MediaCodecRecorder {
 
         @Override
         public void run() {
-            mAudioRecorderRunning = true;
+            mAudioRecorderRunning.set(true);
             ByteBuffer[] encoderInputBuffers = mAudioEncoder.getInputBuffers();
-            while (mAudioRecorderRunning) {
+            while (mAudioRecorderRunning.get()) {
                 int bufferIndex = mAudioEncoder.dequeueInputBuffer(TIMEOUT_USEC);
                 if (bufferIndex >= 0) {
                     ByteBuffer inputBuffer = encoderInputBuffers[bufferIndex];
                     inputBuffer.clear();
                     AudioTimestamp audioTS = new AudioTimestamp();
                     int inputLen = 0;
-                    inputLen = mAudioRecord.read(inputBuffer, AUDIO_SAMPLES_PER_FRAME,
+                    inputLen = mAudioRecord.read(inputBuffer, mAudioBufferBytes,
                             AudioRecord.READ_BLOCKING);
                     int status = mAudioRecord.getTimestamp(audioTS,
                             AudioTimestamp.TIMEBASE_MONOTONIC);
@@ -469,7 +506,7 @@ public class MediaCodecRecorder {
                 }
             }
             mAudioRecord.stop();
-            mAudioEncoderRunning = false;
+            mAudioEncoderRunning.set(false);
         }
     }
 }

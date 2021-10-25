@@ -117,7 +117,7 @@ public class HomeFragment extends Fragment {
             }
         }
 
-        // Load Default layout for all other scenario e.g. HDMI In and Concurrent HDMI
+        // Load Default layout for all other scenario e.g. Camera, HDMI In and Concurrent HDMI
         return inflater.inflate(R.layout.primary_display, container, false);
     }
 

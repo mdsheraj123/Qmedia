@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
 ~ Copyright (c) 2021 The Linux Foundation. All rights reserved.
 ~
 ~ Redistribution and use in source and binary forms, with or without
@@ -40,7 +39,7 @@
         android:id="@+id/button_decode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="40dp"
         android:text="Start"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -48,77 +47,68 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="1.0" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView0"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="28dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:columnCount="4"
+        android:rowCount="4">
 
-    <SurfaceView
-        android:id="@+id/surfaceView1"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="268dp"
-        android:layout_marginTop="28dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView0"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView2"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="160dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView1"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView3"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="268dp"
-        android:layout_marginTop="160dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView2"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView4"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="296dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView3"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView5"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="268dp"
-        android:layout_marginTop="296dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView4"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView6"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="428dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView5"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView7"
-        android:layout_width="127dp"
-        android:layout_height="98dp"
-        android:layout_marginStart="268dp"
-        android:layout_marginTop="428dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView6"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
 
+        <SurfaceView
+            android:id="@+id/surfaceView7"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1" />
+
+    </GridLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

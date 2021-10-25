@@ -194,7 +194,7 @@ public class PresentationBase extends Presentation {
         } else {
             if (mData.getComposeType(mPresentationIndex).equals("OpenGLES")) {
                 mVideoComposer = new VideoComposer(mSurfaceViewList.get(0).getHolder().getSurface(),
-                        1280, 720, 30f, 0.0f, mData.getDecoderInstanceNumber(mPresentationIndex));
+                        1920, 1080, 30f, 0.0f, mData.getDecoderInstanceNumber(mPresentationIndex));
             } else { // This is OPENGL With Encode
                 mVideoComposer = new VideoComposer(mMediaCodecRecorder.getRecorderSurface(), 1920,
                         1080, 30.0f, 0.0f, mData.getDecoderInstanceNumber(mPresentationIndex));

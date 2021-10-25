@@ -118,7 +118,7 @@ public class HomeFragment extends Fragment {
             }
         }
 
-        // Load Default layout for all other scenario e.g. Camera, HDMI In and Concurrent HDMI
+        // Load Default layout for all other scenario e.g. HDMI In and Concurrent HDMI
         return inflater.inflate(R.layout.primary_display, container, false);
     }
 
@@ -426,7 +426,7 @@ public class HomeFragment extends Fragment {
         } else {
             if (mSettingData.getComposeType(0).equals("OpenGLES")) {
                 mVideoComposer = new VideoComposer(mSurfaceViewList.get(0).getHolder().getSurface(),
-                        1280, 720, 30f, 0.0f, mSettingData.getDecoderInstanceNumber(0));
+                        1920, 1080, 30f, 0.0f, mSettingData.getDecoderInstanceNumber(0));
             } else { // This is OPENGL With Encode
                 mVideoComposer = new VideoComposer(mMediaCodecRecorder.getRecorderSurface(), 1920,
                         1080, 30.0f, 0.0f, mSettingData.getDecoderInstanceNumber(0));

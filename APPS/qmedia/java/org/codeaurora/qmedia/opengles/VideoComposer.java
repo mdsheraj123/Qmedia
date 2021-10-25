@@ -379,25 +379,36 @@ class CompositionRenderer {
         this.checkEglError("glEnableVertexAttribArray textureHandle");
 
 
-        int gridSize = (int) Math.ceil(Math.sqrt((double) mInstances));
+        int gridSize = (int) Math.ceil(Math.sqrt(mInstances));
         int numberVertically = (int) Math.ceil((double) mInstances / gridSize);
         int extra = gridSize * numberVertically - mInstances;
+
+        double baseHeight = (double)height / numberVertically;
+        double baseWidth = (double) width / gridSize;
+
         int gridsOccupied = 0;
         for (int index = 0; index < mInstances; index++) {
-            int hOffset = (int) ((double) gridsOccupied / gridSize) * (height / numberVertically);
-            int wOffset = (gridsOccupied % gridSize) * (width / gridSize);
+            double hOffset = ((int)(gridsOccupied / gridSize)) * baseHeight;
+            double wOffset = (gridsOccupied % gridSize) * baseWidth;
 
             if (extra > 0 && gridsOccupied % gridSize == gridSize - 2) {
-                GLES20.glViewport(
-                        wOffset,
-                        hOffset,
-                        (width / gridSize) * (2),
-                        height / numberVertically
-                );
+                int rectWidthEnd = Math.min(width,(int)Math.ceil(wOffset + baseWidth * 2));
+                int rectWidth = rectWidthEnd - (int)Math.floor(wOffset);
+
+                int rectHeightEnd = Math.min(height,(int)Math.ceil(hOffset + baseHeight));
+                int rectHeight = rectHeightEnd - (int)Math.floor(hOffset);
+
+                GLES20.glViewport((int)Math.floor(wOffset), (int)Math.floor(hOffset), rectWidth, rectHeight);
                 extra--;
                 gridsOccupied += 2;
             } else {
-                GLES20.glViewport(wOffset, hOffset, width / gridSize, height / numberVertically);
+                int rectWidthEnd = Math.min(width,(int)Math.ceil(wOffset + baseWidth));
+                int rectWidth = rectWidthEnd - (int)Math.floor(wOffset);
+
+                int rectHeightEnd = Math.min(height,(int)Math.ceil(hOffset + baseHeight));
+                int rectHeight = rectHeightEnd - (int)Math.floor(hOffset);
+
+                GLES20.glViewport((int)Math.floor(wOffset), (int)Math.floor(hOffset), rectWidth, rectHeight);
                 gridsOccupied++;
             }
 

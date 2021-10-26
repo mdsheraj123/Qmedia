@@ -138,6 +138,12 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Reset">
+        <androidx.preference.Preference
+            android:key="reset"
+            android:summary="Reset App Preference" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="Version">
         <androidx.preference.EditTextPreference
             android:key="version_info"

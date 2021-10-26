@@ -30,6 +30,7 @@
 package org.codeaurora.qmedia.fragments;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.camera2.CameraAccessException;
@@ -38,9 +39,13 @@ import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
 import android.view.View;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
+import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
 import androidx.preference.PreferenceScreen;
 
 import org.codeaurora.qmedia.R;
@@ -57,8 +62,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         mPrefScreen = this.getPreferenceScreen();
 
         try {
-            EditTextPreference version_info =
-                    (EditTextPreference) mPrefScreen.findPreference("version_info");
+            EditTextPreference version_info = mPrefScreen.findPreference("version_info");
             version_info.setSummary(getActivity().getApplicationContext().getPackageManager().
                     getPackageInfo(getActivity().getApplicationContext().getPackageName(),
                             0).versionName);
@@ -73,7 +77,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
     }
 
     @Override
-    public void onViewCreated(View view, Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         int navHeight = getResources().getDimensionPixelSize(getResources().
                 getIdentifier("navigation_bar_height", "dimen", "android"));
@@ -101,12 +105,10 @@ public class SettingsFragment extends PreferenceFragmentCompat
     }
 
     void updatePreference() {
-        ListPreference hdmi_source = (ListPreference) mPrefScreen.findPreference("hdmi_1_source");
-        ListPreference decoder_instance =
-                (ListPreference) mPrefScreen.findPreference("hdmi_1_decoder_instance");
-        ListPreference compose_view =
-                (ListPreference) mPrefScreen.findPreference("hdmi_1_compose_view");
-        ListPreference camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_1_camera_id");
+        ListPreference hdmi_source = mPrefScreen.findPreference("hdmi_1_source");
+        ListPreference decoder_instance = mPrefScreen.findPreference("hdmi_1_decoder_instance");
+        ListPreference compose_view = mPrefScreen.findPreference("hdmi_1_compose_view");
+        ListPreference camera_id = mPrefScreen.findPreference("hdmi_1_camera_id");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -134,12 +136,10 @@ public class SettingsFragment extends PreferenceFragmentCompat
             camera_id.setVisible(false);
         }
 
-        hdmi_source = (ListPreference) mPrefScreen.findPreference("hdmi_2_source");
-        decoder_instance =
-                (ListPreference) mPrefScreen.findPreference("hdmi_2_decoder_instance");
-        compose_view =
-                (ListPreference) mPrefScreen.findPreference("hdmi_2_compose_view");
-        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_2_camera_id");
+        hdmi_source = mPrefScreen.findPreference("hdmi_2_source");
+        decoder_instance = mPrefScreen.findPreference("hdmi_2_decoder_instance");
+        compose_view = mPrefScreen.findPreference("hdmi_2_compose_view");
+        camera_id = mPrefScreen.findPreference("hdmi_2_camera_id");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -167,12 +167,10 @@ public class SettingsFragment extends PreferenceFragmentCompat
             camera_id.setVisible(false);
         }
 
-        hdmi_source = (ListPreference) mPrefScreen.findPreference("hdmi_3_source");
-        decoder_instance =
-                (ListPreference) mPrefScreen.findPreference("hdmi_3_decoder_instance");
-        compose_view =
-                (ListPreference) mPrefScreen.findPreference("hdmi_3_compose_view");
-        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_3_camera_id");
+        hdmi_source = mPrefScreen.findPreference("hdmi_3_source");
+        decoder_instance = mPrefScreen.findPreference("hdmi_3_decoder_instance");
+        compose_view = mPrefScreen.findPreference("hdmi_3_compose_view");
+        camera_id = mPrefScreen.findPreference("hdmi_3_camera_id");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -199,19 +197,45 @@ public class SettingsFragment extends PreferenceFragmentCompat
             compose_view.setVisible(false);
             camera_id.setVisible(false);
         }
+
+        // Handle Reset App Preference
+        Preference button = mPrefScreen.findPreference("reset");
+        button.setOnPreferenceClickListener(preference -> {
+            DialogInterface.OnClickListener dialogClickListener = (dialog, which) -> {
+                switch (which) {
+                    case DialogInterface.BUTTON_POSITIVE:
+                        //Yes button clicked
+                        restoreAppPreference();
+                        break;
+
+                    case DialogInterface.BUTTON_NEGATIVE:
+                        //No button clicked
+                        break;
+                }
+            };
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+            builder.setTitle("Restore App Preference");
+            builder.setMessage("Do you wish to continue.").
+                    setPositiveButton("Yes", dialogClickListener).
+                    setNegativeButton("No", dialogClickListener).
+                    show();
+            return true;
+        });
+
     }
 
-    String getLensOrientationString (int facing) {
+    String getLensOrientationString(int facing) {
         String out = "Unknown";
         switch (facing) {
             case CameraCharacteristics.LENS_FACING_BACK:
-                out  = "Back";
+                out = "Back";
                 break;
             case CameraCharacteristics.LENS_FACING_FRONT:
-                out  = "Front";
+                out = "Front";
                 break;
             case CameraCharacteristics.LENS_FACING_EXTERNAL:
-                out  = "External";
+                out = "External";
                 break;
         }
         return out;
@@ -233,23 +257,30 @@ public class SettingsFragment extends PreferenceFragmentCompat
             e.printStackTrace();
         }
 
-        ListPreference camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_1_camera_id");
+        ListPreference camera_id = mPrefScreen.findPreference("hdmi_1_camera_id");
         CharSequence[] cameras = detectedCameras.toArray(new CharSequence[detectedCameras.size()]);
         CharSequence[] cameraIds =
                 cameraIDs.toArray(new CharSequence[cameraIDs.size()]);
         camera_id.setEntries(cameras);
         camera_id.setEntryValues(cameraIds);
-        camera_id.setValueIndex(0);
 
-        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_2_camera_id");
+        camera_id = mPrefScreen.findPreference("hdmi_2_camera_id");
         camera_id.setEntries(cameras);
         camera_id.setEntryValues(cameraIds);
-        camera_id.setValueIndex(0);
 
-        camera_id = (ListPreference) mPrefScreen.findPreference("hdmi_3_camera_id");
+        camera_id = mPrefScreen.findPreference("hdmi_3_camera_id");
         camera_id.setEntries(cameras);
         camera_id.setEntryValues(cameraIds);
-        camera_id.setValueIndex(0);
+    }
 
+    private void restoreAppPreference() {
+        SharedPreferences preferences =
+                PreferenceManager.getDefaultSharedPreferences(getActivity());
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.clear();
+        editor.apply();
+        PreferenceManager.setDefaultValues(getActivity(), R.xml.setting_preference, true);
+        getPreferenceScreen().removeAll();
+        onCreatePreferences(null, null);
     }
 }

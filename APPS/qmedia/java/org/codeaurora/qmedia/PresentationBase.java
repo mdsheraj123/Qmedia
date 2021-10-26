@@ -111,10 +111,12 @@ public class PresentationBase extends Presentation {
             mSurfaceView = findViewById(R.id.secondary_surface_view);
             mSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
                 public void surfaceCreated(SurfaceHolder holder) {
+                    holder.setFixedSize(1920, 1080);
                     mCameraBase = new CameraBase(getContext());
                     mCameraBase.addPreviewStream(holder);
                     if (mData.getCameraID(mPresentationIndex).equals("3")) {
-                        mMediaCodecRecorder = new MediaCodecRecorder(getContext(), 3840, 2160, true);
+                        mMediaCodecRecorder = new MediaCodecRecorder(getContext(),
+                                3840, 2160, true);
                         mCameraBase.addRecorderStream(mMediaCodecRecorder.getRecorderSurface());
                     }
                 }

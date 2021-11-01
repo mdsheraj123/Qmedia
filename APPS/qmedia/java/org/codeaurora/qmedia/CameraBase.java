@@ -37,6 +37,8 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.params.OutputConfiguration;
+import android.hardware.camera2.params.SessionConfiguration;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
@@ -47,14 +49,18 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 public class CameraBase {
 
     private static final String TAG = "CameraBase";
+    private static final CaptureRequest.Key<Byte> BYPASS_RESOURCE_CHECK_KEY =
+            new CaptureRequest.Key<>(
+                    "org.codeaurora.qcamera3.sessionParameters.overrideResourceCostValidation",
+                    byte.class);
     private final Context mCameraContext;
     private final Semaphore mCameraOpenCloseLock = new Semaphore(1);
     private HandlerThread mBackgroundThread;
@@ -105,6 +111,37 @@ public class CameraBase {
             mCameraOpenCloseLock.release();
         }
     };
+
+    private final CameraCaptureSession.StateCallback mCaptureStateCallBack =
+            new CameraCaptureSession.StateCallback() {
+
+                @Override
+                public void onConfigured(
+                        @NonNull CameraCaptureSession cameraCaptureSession) {
+                    // The camera is already closed
+                    if (null == mCameraDevice) {
+                        return;
+                    }
+                    mCaptureSession = cameraCaptureSession;
+                    try {
+                        // Set Default Params
+                        setDefaultCameraParam();
+                        // Finally, we start displaying the camera preview.
+                        mPreviewRequest = mPreviewRequestBuilder.build();
+                        mCaptureSession.setRepeatingRequest(mPreviewRequest,
+                                null, mBackgroundHandler);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onConfigureFailed(
+                        @NonNull CameraCaptureSession cameraCaptureSession) {
+                    Toast.makeText(mCameraContext.getApplicationContext(), "Failed",
+                            Toast.LENGTH_SHORT).show();
+                }
+            };
 
     private void startBackgroundThread() {
         mBackgroundThread = new HandlerThread("Camera2BackgroundThread");
@@ -180,7 +217,12 @@ public class CameraBase {
         try {
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-            List<Surface> outputs = new ArrayList<Surface>();
+            try {
+                mPreviewRequestBuilder.set(BYPASS_RESOURCE_CHECK_KEY, (byte) 0x01);
+            } catch (IllegalArgumentException e) {
+                Log.w(TAG, "Resource ByPass Key does not exist");
+            }
+            List<Surface> outputs = new ArrayList<>();
             mPreviewRequestBuilder.addTarget(mStreamSurfaceHolder.getSurface());
             outputs.add(mStreamSurfaceHolder.getSurface());
 
@@ -188,39 +230,19 @@ public class CameraBase {
                 mPreviewRequestBuilder.addTarget(mRecordSurface);
                 outputs.add(mRecordSurface);
             }
+            List<OutputConfiguration> outConfigurations = new ArrayList<>(outputs.size());
+            for (Surface obj : outputs) {
+                outConfigurations.add(new OutputConfiguration(obj));
+            }
 
+            SessionConfiguration sessionCfg = new SessionConfiguration(
+                    SessionConfiguration.SESSION_REGULAR,
+                    outConfigurations,
+                    new HandlerExecutor(mBackgroundHandler),
+                    mCaptureStateCallBack);
             // Here, we create a CameraCaptureSession for camera preview.
-            mCameraDevice.createCaptureSession(outputs,
-                    new CameraCaptureSession.StateCallback() {
-
-                        @Override
-                        public void onConfigured(
-                                @NonNull CameraCaptureSession cameraCaptureSession) {
-                            // The camera is already closed
-                            if (null == mCameraDevice) {
-                                return;
-                            }
-                            mCaptureSession = cameraCaptureSession;
-                            try {
-                                // Set Default Params
-                                setDefaultCameraParam();
-                                // Finally, we start displaying the camera preview.
-                                mPreviewRequest = mPreviewRequestBuilder.build();
-                                mCaptureSession.setRepeatingRequest(mPreviewRequest,
-                                        null, mBackgroundHandler);
-                            } catch (CameraAccessException e) {
-                                e.printStackTrace();
-                            }
-                        }
-
-                        @Override
-                        public void onConfigureFailed(
-                                @NonNull CameraCaptureSession cameraCaptureSession) {
-                            Toast.makeText(mCameraContext.getApplicationContext(), "Failed",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    }, null
-            );
+            sessionCfg.setSessionParameters(mPreviewRequestBuilder.build());
+            mCameraDevice.createCaptureSession(sessionCfg);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -231,14 +253,12 @@ public class CameraBase {
                 CaptureRequest.CONTROL_AF_MODE_OFF);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE,
                 CaptureRequest.CONTROL_AE_ANTIBANDING_MODE_AUTO);
-        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION,
-                0);
+        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 0);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
                 CaptureRequest.CONTROL_AE_MODE_ON);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
                 CaptureRequest.CONTROL_AE_MODE_ON);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_LOCK, false);
-
         mPreviewRequestBuilder
                 .set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
         mPreviewRequestBuilder.set(CaptureRequest.NOISE_REDUCTION_MODE, 1);
@@ -250,5 +270,15 @@ public class CameraBase {
     }
 }
 
+class HandlerExecutor implements Executor {
+    private final Handler mHandler;
 
+    public HandlerExecutor(Handler handler) {
+        mHandler = handler;
+    }
 
+    @Override
+    public void execute(Runnable runCmd) {
+        mHandler.post(runCmd);
+    }
+}

@@ -27,6 +27,7 @@
 #include <utils/KeyedVector.h>
 #include <utils/List.h>
 #include <utils/RefBase.h>
+#include <VendorTagDescriptor.h>
 #include <mutex>
 
 #include <fmq/MessageQueue.h>
@@ -49,6 +50,7 @@
 #define CAMERA_TEMPLATE_COUNT 10
 
 using namespace android;
+using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
 namespace camera {
 
@@ -94,9 +96,6 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   int32_t Flush(int64_t *lastFrameNumber = NULL);
   int32_t Prepare(int streamId);
   int32_t TearDown(int streamId);
-
-  static int32_t LoadHWModule(const char *moduleId,
-                              const struct hw_module_t **pHmi);
 
  private:
   std::vector<int32_t> current_request_ids_;
@@ -224,6 +223,7 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   bool is_partial_result_supported_;
   uint32_t next_result_frame_number_;
   uint32_t next_result_input_frame_number_;
+  vendor_tag_ops_t vendor_tag_ops_;
   Camera3Monitor monitor_;
   Camera3RequestHandler request_handler_;
 
@@ -243,6 +243,8 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   Camera3PrepareHandler prepare_handler_;
   Camera3InputStream input_stream_;
   uint32_t batch_size_;
+  static std::mutex vendor_tag_mutex_;
+  static sp<VendorTagDescriptor> vendor_tag_desc_;
   static uint32_t client_count_;
 };
 

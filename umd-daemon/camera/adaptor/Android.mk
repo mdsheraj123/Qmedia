@@ -16,6 +16,7 @@ LOCAL_SRC_FILES += camera_request_handler.cc
 LOCAL_SRC_FILES += camera_prepare_handler.cc
 LOCAL_SRC_FILES += camera_stream.cc
 LOCAL_SRC_FILES += camera_utils.cc
+LOCAL_SRC_FILES += camera_hidl_vendor_tag_descriptor.cc
 
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/..
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../include

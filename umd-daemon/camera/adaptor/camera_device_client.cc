@@ -31,6 +31,8 @@
 #include "camera_utils.h"
 #include "camera_device_client.h"
 
+#include "camera_hidl_vendor_tag_descriptor.h"
+
 #ifdef DISABLE_OP_MODES
 #define QCAMERA3_SENSORMODE_ZZHDR_OPMODE      (0xF002)
 #define QCAMERA3_SENSORMODE_FPS_DEFAULT_INDEX (0x0)
@@ -53,6 +55,8 @@ namespace camera {
 
 namespace adaptor {
 
+std::mutex Camera3DeviceClient::vendor_tag_mutex_;
+sp<VendorTagDescriptor> Camera3DeviceClient::vendor_tag_desc_ = nullptr;
 uint32_t Camera3DeviceClient::client_count_ = 0;
 
 Camera3DeviceClient::Camera3DeviceClient(CameraClientCallbacks clientCb)
@@ -166,6 +170,48 @@ int32_t Camera3DeviceClient::Initialize() {
   number_of_cameras_ = camera_device_names_.size();
   CAMERA_INFO("%s: Number of cameras: %d\n", __func__, number_of_cameras_);
 
+  {
+    std::lock_guard<std::mutex> lk(vendor_tag_mutex_);
+    if (client_count_ == 0) {
+      hardware::hidl_vec<VendorTagSection> vt_sections;
+      ::android::hardware::camera::common::V1_0::Status status;
+      ret = camera_provider_->getVendorTags(
+          [&](auto s, const auto& vendorTagSecs) {
+            status = s;
+            if (s == ::android::hardware::camera::common::V1_0::Status::OK) {
+                vt_sections = vendorTagSecs;
+            }
+      });
+
+      if (!ret.isOk()) {
+        CAMERA_ERROR("%s: Error getting vendor tags from provider\n");
+        goto exit;
+      }
+
+      res = CustomVendorTagDescriptor::createDescriptorFromHidl(
+          vt_sections, vendor_tag_desc_);
+
+      if (0 != res) {
+        CAMERA_ERROR("%s: Could not generate descriptor from HIDL,"
+            "received error %s (%d). Camera clients will not be able to use"
+            "vendor tags", __FUNCTION__, strerror(res), res);
+        goto exit;
+      }
+
+      // Set the global descriptor to use with camera metadata
+      res = VendorTagDescriptor::setAsGlobalVendorTagDescriptor(vendor_tag_desc_);
+
+      if (0 != res) {
+        CAMERA_ERROR(
+            "%s: Could not set vendor tag descriptor, "
+            "received error %s (%d). \n",
+            __func__, strerror(-res), res);
+        goto exit;
+      }
+    }
+    ++client_count_;
+  }
+
   alloc_device_interface_ = AllocDeviceFactory::CreateAllocDevice();
   state_ = STATE_CLOSED;
   next_stream_id_ = 0;
@@ -180,6 +226,13 @@ exit:
   if (nullptr != alloc_device_interface_) {
     AllocDeviceFactory::DestroyAllocDevice(alloc_device_interface_);
     alloc_device_interface_ = nullptr;
+  }
+
+  {
+    std::lock_guard<std::mutex> lk(vendor_tag_mutex_);
+    if (client_count_ == 0) {
+      VendorTagDescriptor::clearGlobalVendorTagDescriptor();
+    }
   }
 
   camera_provider_ = nullptr;

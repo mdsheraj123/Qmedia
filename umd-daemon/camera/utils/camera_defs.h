@@ -77,4 +77,3 @@ using ::android::hardware::camera::device::V3_2::BufferUsageFlags;
 using ::android::hardware::camera::device::V3_2::DataspaceFlags;
 using ::android::hardware::camera::device::V3_2::StreamRotation;
 using android::hardware::camera::device::V3_2::RequestTemplate;
-

@@ -45,6 +45,13 @@ using namespace ::android;
 using namespace ::camera::adaptor;
 using namespace ::camera;
 
+enum
+{
+  PARTIAL_MWB_MODE_DISABLE = 0,
+  PARTIAL_MWB_MODE_CCT,
+  PARTIAL_MWB_MODE_GAINS
+};
+
 enum class UmdCameraMessage {
   CAMERA_START,
   CAMERA_STOP,
@@ -66,12 +73,37 @@ private:
   static bool handleVideoControl(uint32_t id, uint32_t request, void * payload,
                                  void * userdata);
 
-  void SetExposureCompensation (CameraMetadata & meta, int32_t compensation);
-  void GetExposureCompensation (CameraMetadata & meta, int16_t * compensation);
-  void SetExposureTime (CameraMetadata & meta, uint32_t exposure);
-  void GetExposureTime (CameraMetadata & meta, uint32_t * exposure);
-  void SetExposureMode (CameraMetadata & meta, uint8_t mode);
-  void GetExposureMode (CameraMetadata & meta, uint8_t * mode);
+  uint32_t GetVendorTagByName (const char * section, const char * name);
+
+  bool InitCameraParamsLocked();
+
+  void SetExposureCompensation (CameraMetadata & meta, int16_t value);
+  void GetExposureCompensation (CameraMetadata & meta, int16_t * value);
+  void SetContrast (CameraMetadata & meta, uint16_t value);
+  void GetContrast (CameraMetadata & meta, uint16_t * value);
+  void SetSaturation (CameraMetadata & meta, uint16_t value);
+  void GetSaturation (CameraMetadata & meta, uint16_t * value);
+  void SetSharpness (CameraMetadata & meta, uint16_t value);
+  void GetSharpness (CameraMetadata & meta, uint16_t * value);
+  void SetADRC (CameraMetadata & meta, uint16_t value);
+  void GetADRC (CameraMetadata & meta, uint16_t * value);
+  void SetAntibanding (CameraMetadata & meta, uint8_t value);
+  void GetAntibanding (CameraMetadata & meta, uint8_t * value);
+  void SetISO (CameraMetadata & meta, uint16_t value);
+  void GetISO (CameraMetadata & meta, uint16_t * value);
+  void SetWbTemperature (CameraMetadata & meta, uint16_t value);
+  void GetWbTemperature (CameraMetadata & meta, uint16_t * value);
+  void SetWbMode (CameraMetadata & meta, uint8_t value);
+  void GetWbMode (CameraMetadata & meta, uint8_t * value);
+  void SetExposureTime (CameraMetadata & meta, uint32_t value);
+  void GetExposureTime (CameraMetadata & meta, uint32_t * value);
+  void SetExposureMode (CameraMetadata & meta, uint8_t value);
+  void GetExposureMode (CameraMetadata & meta, uint8_t * value);
+  void SetFocusMode (CameraMetadata & meta, uint8_t value);
+  void GetFocusMode (CameraMetadata & meta, uint8_t * value);
+  void SetZoom(CameraMetadata & meta, uint16_t magnification,
+      int32_t pan, int32_t tilt);
+  void GetZoom(CameraMetadata & meta, uint16_t * magnification);
 
   void ErrorCb(CameraErrorCode errorCode,
                            const CaptureResultExtras &extras);
@@ -91,7 +123,9 @@ private:
   bool CameraSubmitRequest();
   bool CameraSubmitRequestLocked();
   bool GetCameraMetadata(CameraMetadata &meta);
+  bool GetCameraMetadataLocked(CameraMetadata &meta);
   bool SetCameraMetadata(CameraMetadata &meta);
+  bool SetCameraMetadataLocked(CameraMetadata &meta);
 
   UmdGadget *mGadget;
   UmdVideoSetup mVsetup;

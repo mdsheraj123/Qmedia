@@ -30,7 +30,11 @@
 #include "umd-camera.h"
 #include "umd-logging.h"
 
+#include <VendorTagDescriptor.h>
+
 #define LOG_TAG "UmdCamera"
+
+using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
 const uint32_t STREAM_BUFFER_COUNT = 4;
 const uint32_t UAC_SAMPLE_RATE = 48000;
@@ -65,7 +69,9 @@ UmdCamera::~UmdCamera() {
 
   mMsg.push(UmdCameraMessage::CAMERA_TERMINATE);
 
-  mCameraThread->join();
+  if (mCameraThread) {
+    mCameraThread->join();
+  }
 
   mAudioRecorder->Stop();
 
@@ -190,35 +196,277 @@ bool UmdCamera::disableVideoStream(void * userdata) {
   return true;
 }
 
-void UmdCamera::SetExposureCompensation (CameraMetadata & meta, int32_t compensation)
-{
-  meta.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &compensation, 1);
+uint32_t UmdCamera::GetVendorTagByName(const char * section, const char * name) {
+  sp<VendorTagDescriptor> desc;
+  uint32_t tag = 0;
+
+  desc = VendorTagDescriptor::getGlobalVendorTagDescriptor();
+  if (desc.get() == nullptr) {
+    UMD_LOG_ERROR ("Failed to get Vendor Tag Descriptor!\n");
+    return 0;
+  }
+
+  auto status = desc->lookupTag(android::String8(name),
+      android::String8(section), &tag);
+  if (status != 0) {
+    UMD_LOG_ERROR ("Unable to find vendor tag for '%s', section '%s'!\n",
+        name, section);
+    return 0;
+  }
+  return tag;
 }
 
-void UmdCamera::GetExposureCompensation (CameraMetadata & meta, int16_t * compensation)
+bool UmdCamera::InitCameraParamsLocked() {
+  CameraMetadata meta;
+  if (!GetCameraMetadataLocked(meta)) {
+    return false;
+  }
+
+  uint32_t tag = GetVendorTagByName (
+      "org.codeaurora.qcamera3.iso_exp_priority", "use_iso_exp_priority");
+  if (tag != 0) {
+    int64_t isomode = 0; // ISO_MODE_AUTO
+    meta.update(tag, &isomode, 1);
+  }
+
+  if (!SetCameraMetadataLocked(meta)) {
+    UMD_LOG_ERROR("Set camera metadata failed!\n");
+    return false;
+  }
+
+  return true;
+}
+
+void UmdCamera::SetExposureCompensation(CameraMetadata & meta, int16_t value)
+{
+  int32_t exposure = static_cast<int32_t>(value);
+  meta.update(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION, &exposure, 1);
+}
+
+void UmdCamera::GetExposureCompensation(CameraMetadata & meta, int16_t * value)
 {
   if (meta.exists(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION)) {
-    *compensation = static_cast<int16_t>(
+    *value = static_cast<int16_t>(
         meta.find(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION).data.i32[0]);
   }
 }
 
-void UmdCamera::SetExposureTime (CameraMetadata & meta, uint32_t exposure)
-{
+void UmdCamera::SetContrast(CameraMetadata & meta, uint16_t value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.contrast", "level");
+  if (tag != 0) {
+    int32_t contrast = static_cast<int32_t>(value * 2 - 100);
+    meta.update(tag, &contrast, 1);
+  }
+}
+
+void UmdCamera::GetContrast(CameraMetadata & meta, uint16_t * value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.contrast", "level");
+  if (tag != 0 && meta.exists(tag)) {
+    int32_t contrast = meta.find(tag).data.i32[0];
+    contrast = (contrast + 200) / 2;
+    *value = static_cast<uint16_t>(contrast);
+  }
+}
+
+void UmdCamera::SetSaturation(CameraMetadata & meta, uint16_t value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.saturation", "use_saturation");
+  if (tag != 0) {
+    int32_t saturation = static_cast<int32_t>(value);
+    meta.update(tag, &saturation, 1);
+  }
+}
+
+void UmdCamera::GetSaturation(CameraMetadata & meta, uint16_t * value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.saturation", "use_saturation");
+
+  if (tag != 0 && meta.exists(tag)) {
+    *value = static_cast<int16_t>(
+        meta.find(tag).data.i32[0]);
+  }
+}
+
+void UmdCamera::SetSharpness(CameraMetadata & meta, uint16_t value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.sharpness", "strength");
+  if (tag != 0) {
+    int32_t sharpness = static_cast<int32_t>(value);
+    meta.update(tag, &sharpness, 1);
+  }
+}
+
+void UmdCamera::GetSharpness(CameraMetadata & meta, uint16_t * value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.sharpness", "strength");
+
+  if (tag != 0 && meta.exists(tag)) {
+    *value = static_cast<uint16_t>(
+        meta.find(tag).data.i32[0]);
+  }
+}
+
+void UmdCamera::SetADRC(CameraMetadata & meta, uint16_t value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.adrc", "disable");
+  if (tag != 0) {
+    uint8_t adrc = static_cast<uint8_t>(value);
+    meta.update(tag, &adrc, 1);
+  }
+}
+
+void UmdCamera::GetADRC(CameraMetadata & meta, uint16_t * value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.adrc", "disable");
+
+  if (tag != 0 && meta.exists(tag)) {
+    *value = meta.find(tag).data.u8[0];
+  }
+}
+
+void UmdCamera::SetAntibanding(CameraMetadata & meta, uint8_t value) {
+  uint8_t mode = 0;
+  switch (value) {
+    case UMD_VIDEO_ANTIBANDING_AUTO:
+      mode = ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO;
+      break;
+    case UMD_VIDEO_ANTIBANDING_DISABLED:
+      mode = ANDROID_CONTROL_AE_ANTIBANDING_MODE_OFF;
+      break;
+    case UMD_VIDEO_ANTIBANDING_60HZ:
+      mode = ANDROID_CONTROL_AE_ANTIBANDING_MODE_60HZ;
+      break;
+    case UMD_VIDEO_ANTIBANDING_50HZ:
+      mode = ANDROID_CONTROL_AE_ANTIBANDING_MODE_50HZ;
+      break;
+    default:
+      UMD_LOG_ERROR ("Unsupported Antibanding mode: %d!\n", value);
+      return;
+  }
+  meta.update(ANDROID_CONTROL_AE_ANTIBANDING_MODE, &mode, 1);
+}
+
+void UmdCamera::GetAntibanding(CameraMetadata & meta, uint8_t * value) {
+  if (meta.exists(ANDROID_CONTROL_AE_ANTIBANDING_MODE)) {
+    uint8_t mode = meta.find(ANDROID_CONTROL_AE_ANTIBANDING_MODE).data.u8[0];
+    switch (mode) {
+      case ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO:
+        *value = UMD_VIDEO_ANTIBANDING_AUTO;
+        break;
+      case ANDROID_CONTROL_AE_ANTIBANDING_MODE_OFF:
+        *value = UMD_VIDEO_ANTIBANDING_DISABLED;
+        break;
+      case ANDROID_CONTROL_AE_ANTIBANDING_MODE_60HZ:
+        *value = UMD_VIDEO_ANTIBANDING_60HZ;
+        break;
+      case ANDROID_CONTROL_AE_ANTIBANDING_MODE_50HZ:
+        *value = UMD_VIDEO_ANTIBANDING_50HZ;
+        break;
+      default:
+        UMD_LOG_ERROR ("Unsupported Antibanding mode: %d!\n", mode);
+        return;
+    }
+  }
+}
+
+void UmdCamera::SetISO(CameraMetadata & meta, uint16_t value) {
+  int32_t priority = 0;
+
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.iso_exp_priority", "select_priority");
+  if (tag != 0) {
+    meta.update(tag, &priority, 1);
+  }
+
+  tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.iso_exp_priority", "use_iso_value");
+  if (tag != 0) {
+    int32_t isovalue = value;
+    meta.update(tag, &isovalue, 1);
+  }
+}
+
+void UmdCamera::GetISO(CameraMetadata & meta, uint16_t * value) {
+    uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.iso_exp_priority", "use_iso_value");
+  if (tag != 0 && meta.exists(tag)) {
+    *value = static_cast<uint16_t>(meta.find(tag).data.i32[0]);
+  }
+}
+
+void UmdCamera::SetWbTemperature(CameraMetadata & meta, uint16_t value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.manualWB", "color_temperature");
+   if (tag != 0) {
+     int32_t color_temperature = static_cast<int32_t>(value);
+     meta.update(tag, &color_temperature, 1);
+   }
+}
+
+void UmdCamera::GetWbTemperature(CameraMetadata & meta, uint16_t * value) {
+  uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.manualWB", "color_temperature");
+   if (tag != 0 && meta.exists(tag)) {
+     *value = static_cast<uint16_t>(meta.find(tag).data.i32[0]);
+   }
+}
+
+void UmdCamera::SetWbMode(CameraMetadata & meta, uint8_t value) {
+  int32_t mode = PARTIAL_MWB_MODE_DISABLE;
+  switch (value) {
+    case UMD_VIDEO_WB_MODE_AUTO:
+      mode = PARTIAL_MWB_MODE_DISABLE;
+      break;
+    case UMD_VIDEO_WB_MODE_MANUAL:
+      mode = PARTIAL_MWB_MODE_CCT;
+      break;
+    default:
+      UMD_LOG_ERROR ("\nUnsupported WB mode: %d!\n", value);
+      return;
+  }
+
+  uint32_t tag = GetVendorTagByName (
+      "org.codeaurora.qcamera3.manualWB", "partial_mwb_mode");
+  if (tag != 0) {
+    meta.update(tag, &mode, 1);
+  }
+}
+
+void UmdCamera::GetWbMode(CameraMetadata & meta, uint8_t * value) {
+    uint32_t tag = GetVendorTagByName (
+      "org.codeaurora.qcamera3.manualWB", "partial_mwb_mode");
+  if (tag != 0 && meta.exists(tag)) {
+    int32_t mode = meta.find(tag).data.i32[0];
+    switch(mode) {
+      case PARTIAL_MWB_MODE_DISABLE:
+        *value = UMD_VIDEO_WB_MODE_AUTO;
+        break;
+      case PARTIAL_MWB_MODE_CCT:
+        *value = UMD_VIDEO_WB_MODE_MANUAL;
+        break;
+      default:
+        UMD_LOG_ERROR ("Unsupported WB mode: %d!\n", mode);
+        break;
+    }
+  }
+}
+
+void UmdCamera::SetExposureTime(CameraMetadata & meta, uint32_t exposure) {
   int64_t exposure_time = exposure * 100000;
   meta.update(ANDROID_SENSOR_EXPOSURE_TIME, &exposure_time, 1);
 }
 
-void UmdCamera::GetExposureTime (CameraMetadata & meta, uint32_t * exposure)
+void UmdCamera::GetExposureTime(CameraMetadata & meta, uint32_t * exposure)
 {
   if (meta.exists(ANDROID_SENSOR_EXPOSURE_TIME)) {
     int64_t exposure_time = meta.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
-    *exposure = exposure_time / 100000;
+    *exposure = static_cast<uint32_t>(exposure_time / 100000);
   }
 }
 
-void UmdCamera::SetExposureMode (CameraMetadata & meta, uint8_t mode)
-{
+void UmdCamera::SetExposureMode(CameraMetadata & meta, uint8_t mode) {
   uint8_t exposure_mode;
   switch (mode) {
     case UMD_VIDEO_EXPOSURE_MODE_AUTO:
@@ -234,7 +482,7 @@ void UmdCamera::SetExposureMode (CameraMetadata & meta, uint8_t mode)
   meta.update(ANDROID_CONTROL_AE_MODE, &exposure_mode, 1);
 }
 
-void UmdCamera::GetExposureMode (CameraMetadata & meta, uint8_t * mode)
+void UmdCamera::GetExposureMode(CameraMetadata & meta, uint8_t * mode)
 {
   if (meta.exists(ANDROID_CONTROL_AE_MODE)) {
     uint8_t ae_mode = meta.find(ANDROID_CONTROL_AE_MODE).data.u8[0];
@@ -246,8 +494,107 @@ void UmdCamera::GetExposureMode (CameraMetadata & meta, uint8_t * mode)
   }
 }
 
+void UmdCamera::SetFocusMode(CameraMetadata & meta, uint8_t value) {
+  uint8_t mode  = 0;
+  switch (value) {
+    case UMD_VIDEO_FOCUS_MODE_AUTO:
+      mode = ANDROID_CONTROL_AF_MODE_AUTO;
+      break;
+    case UMD_VIDEO_FOCUS_MODE_MANUAL:
+      mode = ANDROID_CONTROL_AF_MODE_OFF;
+      break;
+    default:
+      UMD_LOG_ERROR ("Unsupported Focus mode: %d!\n", value);
+      return;
+  }
+  meta.update(ANDROID_CONTROL_AF_MODE, &mode, 1);
+}
+
+void UmdCamera::GetFocusMode(CameraMetadata & meta, uint8_t * value) {
+  if (meta.exists(ANDROID_CONTROL_AF_MODE)) {
+    uint8_t mode = meta.find(ANDROID_CONTROL_AF_MODE).data.u8[0];
+    switch (mode) {
+      case ANDROID_CONTROL_AF_MODE_AUTO:
+        *value = UMD_VIDEO_FOCUS_MODE_AUTO;
+        break;
+      case ANDROID_CONTROL_AF_MODE_OFF:
+        *value = UMD_VIDEO_FOCUS_MODE_MANUAL;
+        break;
+      default:
+        UMD_LOG_ERROR ("Unsupported Focus mode: %d!\n", mode);
+        return;
+    }
+  }
+}
+
+void UmdCamera::SetZoom(CameraMetadata & meta, uint16_t magnification,
+    int32_t pan, int32_t tilt) {
+
+  int32_t sensor_x = 0, sensor_y = 0, sensor_w = 0, sensor_h = 0;
+  int32_t crop[4];
+
+  if (mStaticInfo.exists(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE)) {
+    sensor_x =
+        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[0];
+    sensor_y =
+        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[1];
+    sensor_w =
+        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[2];
+    sensor_h =
+        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[3];
+
+    int32_t zoom_w = (sensor_w - sensor_x) / (magnification / 100.0);
+    int32_t zoom_h = (sensor_h - sensor_y) / (magnification / 100.0);
+
+    int32_t zoom_x = ((sensor_w - sensor_x) - zoom_w) / 2;
+    zoom_x += zoom_x * pan / (100.0 * 3600);
+
+    int32_t zoom_y = ((sensor_h - sensor_y) - zoom_h) / 2;
+    zoom_y += zoom_y * tilt / (100.0 * 3600);
+
+    crop[0] = zoom_x;
+    crop[1] = zoom_y;
+    crop[2] = zoom_w;
+    crop[3] = zoom_h;
+
+    meta.update(ANDROID_SCALER_CROP_REGION, crop, 4);
+  }
+}
+
+void UmdCamera::GetZoom(CameraMetadata & meta, uint16_t * magnification) {
+  int32_t zoom_x = 0, zoom_y = 0, zoom_w = 0, zoom_h = 0;
+  int32_t sensor_x = 0, sensor_y = 0, sensor_w = 0, sensor_h = 0;
+
+  if (!meta.exists(ANDROID_SCALER_CROP_REGION)) {
+    UMD_LOG_ERROR("Scaller crop region metadata doesn't exist.\n");
+    return;
+  }
+
+  if (!mStaticInfo.exists(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE)) {
+    UMD_LOG_ERROR("Sensor info active array metadata tag doesn't exist.\n");
+    return;
+  }
+
+  zoom_x = meta.find(ANDROID_SCALER_CROP_REGION).data.i32[0];
+  zoom_y = meta.find(ANDROID_SCALER_CROP_REGION).data.i32[1];
+  zoom_w = meta.find(ANDROID_SCALER_CROP_REGION).data.i32[2];
+  zoom_h = meta.find(ANDROID_SCALER_CROP_REGION).data.i32[3];
+
+  sensor_x = mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[0];
+  sensor_y = mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[1];
+  sensor_w = mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[2];
+  sensor_h = mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[3];
+
+  zoom_w = (zoom_w == 0) ? sensor_w : zoom_w;
+  zoom_h = (zoom_h == 0) ? sensor_h : zoom_h;
+
+  *magnification = ((((float) sensor_w / zoom_w) +
+      ((float) sensor_h / zoom_h)) / 2) * 100;
+}
+
 bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
                                    void * payload, void * userdata) {
+
   UmdCamera *ctx = static_cast<UmdCamera*>(userdata);
   CameraMetadata metadata;
   if (!ctx->GetCameraMetadata(metadata)) {
@@ -260,29 +607,119 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     case UMD_VIDEO_CTRL_BRIGHTNESS:
       switch (request) {
         case UMD_CTRL_SET_REQUEST:
-          ctx->SetExposureCompensation (metadata, *((int16_t*) payload));
+          ctx->SetExposureCompensation(metadata, *((int16_t*) payload));
           break;
         case UMD_CTRL_GET_REQUEST:
-          ctx->GetExposureCompensation (metadata, (int16_t*) payload);
+          ctx->GetExposureCompensation(metadata, (int16_t*) payload);
           break;
         default:
-          UMD_LOG_ERROR ("Unknown control request 0x%X!\n", request);
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
           break;
       }
       break;
     case UMD_VIDEO_CTRL_CONTRAST:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetContrast(metadata, *((uint16_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetContrast(metadata, (uint16_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_SATURATION:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetSaturation(metadata, *((uint16_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetSaturation(metadata, (uint16_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_SHARPNESS:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetSharpness (metadata, *((uint16_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetSharpness (metadata, (uint16_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_BACKLIGHT_COMPENSATION:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetADRC (metadata, *((uint16_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetADRC (metadata, (uint16_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_ANTIBANDING:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetAntibanding (metadata, *((uint8_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetAntibanding (metadata, (uint8_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
+      break;
+    case UMD_VIDEO_CTRL_GAIN:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetISO (metadata, *((uint16_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetISO (metadata, (uint16_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_WB_TEMPERTURE:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetWbTemperature (metadata, *((uint16_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetWbTemperature (metadata, (uint16_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_WB_MODE:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetWbMode (metadata, *((uint8_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetWbMode (metadata, (uint8_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_EXPOSURE_TIME:
       switch (request) {
@@ -293,7 +730,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
           ctx->GetExposureTime (metadata, (uint32_t*) payload);
           break;
         default:
-          UMD_LOG_ERROR ("Unknown control request 0x%X!\n", request);
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
           break;
       }
       break;
@@ -306,24 +743,73 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
           ctx->GetExposureMode (metadata, (uint8_t*) payload);
           break;
         default:
-          UMD_LOG_ERROR ("Unknown control request 0x%X!\n", request);
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
           break;
       }
       break;
     case UMD_VIDEO_CTRL_EXPOSURE_PRIORITY:
       break;
     case UMD_VIDEO_CTRL_FOCUS_MODE:
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          ctx->SetFocusMode (metadata, *((uint8_t*) payload));
+          break;
+        case UMD_CTRL_GET_REQUEST:
+          ctx->GetFocusMode (metadata, (uint8_t*) payload);
+          break;
+        default:
+          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+          break;
+      }
       break;
     case UMD_VIDEO_CTRL_ZOOM:
     case UMD_VIDEO_CTRL_PANTILT:
+      static int32_t pan = 0, tilt = 0;
+      static uint16_t magnification = 100;
+      switch (request) {
+        case UMD_CTRL_SET_REQUEST:
+          if (id == UMD_VIDEO_CTRL_ZOOM)
+            magnification = *((uint16_t*) payload);
 
+          if (id == UMD_VIDEO_CTRL_PANTILT) {
+            uint8_t *data = (uint8_t*) payload;
+
+            pan = (int32_t) data[0] | (data[1] << 8) | (data[2] << 16) |
+                (data[3] << 24);
+            tilt = (int32_t) data[4] | (data[5] << 8) | (data[6] << 16) |
+                (data[7] << 24);
+          }
+          ctx->SetZoom (metadata, magnification, pan, tilt);
+          break;
+        case UMD_CTRL_GET_REQUEST:
+            ctx->GetZoom (metadata, &magnification);
+
+            if (id == UMD_VIDEO_CTRL_ZOOM)
+              *((uint16_t*) payload) = magnification;
+
+            if (id == UMD_VIDEO_CTRL_PANTILT) {
+              uint8_t *data = (uint8_t*) payload;
+
+              data[0] = pan & 0xFF;
+              data[1] = (pan >> 8) & 0xFF;
+              data[2] = (pan >> 16) & 0xFF;
+              data[3] = (pan >> 24) & 0xFF;
+
+              data[4] = tilt & 0xFF;
+              data[5] = (tilt >> 8) & 0xFF;
+              data[6] = (tilt >> 16) & 0xFF;
+              data[7] = (tilt >> 24) & 0xFF;
+           }
+           break;
+      }
+      break;
     default:
-      UMD_LOG_ERROR ("Unknown control request 0x%X!\n", id);
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", id);
       break;
   }
   if (request == UMD_CTRL_SET_REQUEST) {
     if (!ctx->SetCameraMetadata(metadata)) {
-      UMD_LOG_ERROR ("Set camera metadata failed!\n");
+      UMD_LOG_ERROR("Set camera metadata failed!\n");
       return false;
     }
   }
@@ -530,6 +1016,8 @@ bool UmdCamera::CameraStart() {
     return false;
   }
 
+  InitCameraParamsLocked();
+
   if (!CameraSubmitRequestLocked()) {
     UMD_LOG_ERROR ("SubmitRequest failed!\n");
     return false;
@@ -570,6 +1058,7 @@ bool UmdCamera::CameraStop() {
   }
 
   mVideoBufferThread->join();
+  mVideoBufferThread = nullptr;
 
   for (uint32_t i = 0; i < mRequest.streamIds.size(); i++) {
     ret = mDeviceClient->DeleteStream(mRequest.streamIds[i], false);
@@ -602,6 +1091,10 @@ bool UmdCamera::CameraSubmitRequestLocked() {
 
 bool UmdCamera::GetCameraMetadata(CameraMetadata &meta) {
   const std::lock_guard<std::mutex> lock(mCameraMutex);
+  return GetCameraMetadataLocked(meta);
+}
+
+bool UmdCamera::GetCameraMetadataLocked(CameraMetadata &meta) {
   meta.clear();
   meta.append(mRequest.metadata);
   return true;
@@ -609,6 +1102,10 @@ bool UmdCamera::GetCameraMetadata(CameraMetadata &meta) {
 
 bool UmdCamera::SetCameraMetadata(CameraMetadata &meta) {
   const std::lock_guard<std::mutex> lock(mCameraMutex);
+  return SetCameraMetadataLocked(meta);
+}
+
+bool UmdCamera::SetCameraMetadataLocked(CameraMetadata &meta) {
   mRequest.metadata.clear();
   mRequest.metadata.append(meta);
   mMsg.push(UmdCameraMessage::CAMERA_SUBMIT_REQUEST);

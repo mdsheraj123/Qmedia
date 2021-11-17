@@ -863,12 +863,7 @@ int32_t Camera3DeviceClient::CaclulateBlobSize(int32_t width, int32_t height) {
   maxJpegBufferSize = jpegBufMaxSize.data.i32[0];
   assert(JPEG_BUFFER_SIZE_MIN < maxJpegBufferSize);
 
-  // Calculate final jpeg buffer size for the given resolution.
-  float scaleFactor =
-      ((float)(width * height)) / (maxJpegSizeWidth * maxJpegSizeHeight);
-  ssize_t jpegBufferSize =
-      scaleFactor * (maxJpegBufferSize - JPEG_BUFFER_SIZE_MIN) +
-      JPEG_BUFFER_SIZE_MIN;
+  ssize_t jpegBufferSize = width * height;
   if (jpegBufferSize > maxJpegBufferSize) {
     jpegBufferSize = maxJpegBufferSize;
   }

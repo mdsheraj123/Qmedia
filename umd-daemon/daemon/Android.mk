@@ -22,6 +22,7 @@ LOCAL_SHARED_LIBRARIES := \
     libutils \
     libcutils \
     libfmq \
+    libhardware \
     android.hardware.camera.provider@2.4 \
     android.hardware.camera.device@1.0 \
     android.hardware.camera.device@3.2 \

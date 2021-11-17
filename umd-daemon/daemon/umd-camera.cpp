@@ -31,8 +31,13 @@
 #include "umd-logging.h"
 
 #include <VendorTagDescriptor.h>
+#include <hardware/camera3.h>
 
 #define LOG_TAG "UmdCamera"
+
+#ifndef JPEG_BLOB_OFFSET
+#define JPEG_BLOB_OFFSET (0)
+#endif
 
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
@@ -846,20 +851,6 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
   MemAllocFlags usage;
   MemAllocError ret;
 
-  switch (buffer.info.format) {
-    case BufferFormat::kBLOB:
-      maxsize = buffer.info.plane_info[0].stride;
-      size = buffer.info.plane_info[0].width * buffer.info.plane_info[0].height / 2;
-      break;
-    case BufferFormat::kYUY2:
-      size = buffer.info.plane_info[0].stride * buffer.info.plane_info[0].height * 2;
-      break;
-    default:
-      UMD_LOG_ERROR ("Unsupported format %d!\n", buffer.info.format);
-      goto fail_return;
-      break;
-  }
-
   if (mActive) {
     usage.flags = IMemAllocUsage::kSwReadOften;
     ret = mAllocDeviceInterface->MapBuffer(
@@ -872,6 +863,20 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
       UMD_LOG_ERROR("%s: Unable to map buffer: %p res: %d\n", __func__,
           mapped_buffer, ret);
       goto fail_return;
+    }
+
+    switch (buffer.info.format) {
+      case BufferFormat::kBLOB:
+        maxsize = buffer.info.plane_info[0].size;
+        size = GetBlobSize(mapped_buffer, buffer.info.plane_info[0].size);
+        break;
+      case BufferFormat::kYUY2:
+        size = buffer.info.plane_info[0].stride * buffer.info.plane_info[0].height * 2;
+        break;
+      default:
+        UMD_LOG_ERROR("Unsupported format %d!\n", buffer.info.format);
+        goto fail_unmap;
+        break;
     }
 
     uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
@@ -1110,4 +1115,24 @@ bool UmdCamera::SetCameraMetadataLocked(CameraMetadata &meta) {
   mRequest.metadata.append(meta);
   mMsg.push(UmdCameraMessage::CAMERA_SUBMIT_REQUEST);
   return true;
+}
+
+uint32_t UmdCamera::GetBlobSize(uint8_t *buffer, uint32_t size) {
+  uint32_t bsize = sizeof(struct camera3_jpeg_blob);
+  uint32_t res = size;
+
+  if (size > bsize) {
+    uint8_t *footer = buffer + size - bsize - JPEG_BLOB_OFFSET;
+    struct camera3_jpeg_blob *blob = (struct camera3_jpeg_blob *) footer;
+
+    if (CAMERA3_JPEG_BLOB_ID == blob->jpeg_blob_id) {
+      res = blob->jpeg_size;
+    } else {
+      UMD_LOG_ERROR("%s Invalid blob structure!\n", __func__);
+    }
+  } else {
+    UMD_LOG_ERROR("%s Invalid blob size: %u\n", __func__, bsize);
+  }
+
+  return res;
 }

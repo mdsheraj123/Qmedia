@@ -127,6 +127,8 @@ private:
   bool SetCameraMetadata(CameraMetadata &meta);
   bool SetCameraMetadataLocked(CameraMetadata &meta);
 
+  uint32_t GetBlobSize(uint8_t *buffer, uint32_t size);
+
   UmdGadget *mGadget;
   UmdVideoSetup mVsetup;
   UmdVideoCallbacks mUmdVideoCallbacks;

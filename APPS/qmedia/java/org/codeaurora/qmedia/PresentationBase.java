@@ -181,7 +181,7 @@ public class PresentationBase extends Presentation {
     }
 
     private void createMediaCodecDecoderInstances() {
-        int count = 0;
+        int count = mPresentationIndex;
         if (mData.getComposeType(mPresentationIndex).equals("SF")) {
             for (SurfaceView it : mSurfaceViewList) {
                 mMediaCodecDecoderList.add(new MediaCodecDecoder(it.getHolder(),

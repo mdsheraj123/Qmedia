@@ -77,7 +77,10 @@ public final class MediaCodecDecoder {
                 }
                 try {
                     Log.i(TAG, "format : " + format);
-                    format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 65536);
+                    // Enable Low Latency Mode
+                    format.setInteger("vendor.qti-ext-dec-low-latency.enable", 1);
+                    // Real Time Priority
+                    format.setInteger(MediaFormat.KEY_PRIORITY, 0);
                     mVideoDecoder.configure(format, mSurface, null, 0 /* Decode */);
                 } catch (Exception e) {
                     e.printStackTrace();

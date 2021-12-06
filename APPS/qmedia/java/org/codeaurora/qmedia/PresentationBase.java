@@ -145,7 +145,7 @@ public class PresentationBase extends Presentation {
     }
 
     public void start() {
-        Log.d(TAG, "Starting secondary display");
+        Log.v(TAG, "Starting secondary display Enter");
         if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode") &&
                 mMediaCodecRecorder != null) {
             mMediaCodecRecorder.start(0);
@@ -160,10 +160,11 @@ public class PresentationBase extends Presentation {
             mHDMIinAudioPlayback.start();
             mMediaCodecRecorder.start(0);
         }
+        Log.v(TAG, "Starting secondary display Exit");
     }
 
     public void stop() {
-        Log.d(TAG, "Stopping secondary display");
+        Log.v(TAG, "Stopping secondary display Enter");
         if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode") &&
                 mMediaCodecRecorder != null) {
             mMediaCodecRecorder.stop();
@@ -178,10 +179,11 @@ public class PresentationBase extends Presentation {
         if (mCameraBase != null) {
             mCameraBase.closeCamera();
         }
+        Log.v(TAG, "Stopping secondary display Exit");
     }
 
     private void createMediaCodecDecoderInstances() {
-        int count = 0;
+        int count = mPresentationIndex;
         if (mData.getComposeType(mPresentationIndex).equals("SF")) {
             for (SurfaceView it : mSurfaceViewList) {
                 mMediaCodecDecoderList.add(new MediaCodecDecoder(it.getHolder(),

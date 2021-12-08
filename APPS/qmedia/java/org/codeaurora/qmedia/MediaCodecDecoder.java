@@ -135,19 +135,15 @@ public final class MediaCodecDecoder {
                     ByteBuffer inputBuffer = inputBuffers[index];
                     int sampleSize = mExtractor.readSampleData(inputBuffer, 0);
 
-                    if (mExtractor.advance() && sampleSize > 0) {
+                    if (sampleSize >= 0) {
                         mVideoDecoder.queueInputBuffer(index, 0, sampleSize,
                                 mExtractor.getSampleTime(), 0);
                     } else {
                         Log.d(TAG, "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-                        mVideoDecoder.queueInputBuffer(
-                                index,
-                                0,
-                                0,
-                                0,
-                                MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                        );
+                        mVideoDecoder.queueInputBuffer(index, 0, 0,
+                                0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                     }
+                    mExtractor.advance();
                 }
                 int outIndex = mVideoDecoder.dequeueOutputBuffer(newBufferInfo, 1000);
 

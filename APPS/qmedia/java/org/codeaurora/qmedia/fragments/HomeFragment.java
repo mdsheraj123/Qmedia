@@ -144,20 +144,15 @@ public class HomeFragment extends Fragment {
 
     @Override
     public void onResume() {
+        Log.v(TAG, "Enter onResume");
         super.onResume();
-        if (mSettingData.getHDMISource(1).equals("None") &&
-                mSettingData.getHDMISource(2).equals("None")) {
-            return;
-        }
         Display[] displays = mDisplayManager.getDisplays(
                 DisplayManager.DISPLAY_CATEGORY_PRESENTATION);
         Log.d(TAG, "Number of display # " + displays.length);
 
         for (int it = 0; it < displays.length; it++) {
-            if (!mSettingData.getHDMISource(it + 1).equals("None")) {
-                mPresentationBaseList.add(new PresentationBase(getContext(), displays[it],
-                        mSettingData, it + 1));
-            }
+            mPresentationBaseList.add(new PresentationBase(getContext(), displays[it],
+                    mSettingData, it + 1));
         }
 
         for (PresentationBase it : mPresentationBaseList) {
@@ -167,6 +162,7 @@ public class HomeFragment extends Fragment {
                 mPresentationBaseList.remove(it);
             }
         }
+        Log.v(TAG, "Exit onResume");
     }
 
     @Override

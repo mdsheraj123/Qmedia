@@ -51,6 +51,9 @@ public final class MediaCodecDecoder {
     private MediaExtractor mExtractor;
     private Boolean mVideoDecoderRunning = false;
     private Thread mVideoDecoderThread;
+    private boolean mIsFirstFrameReceived;
+    private long mFirstSampleTimestampUs;
+    private long mFirstSampleReceivedTimeUs;
 
     public MediaCodecDecoder(SurfaceHolder surfaceHolder, Surface surface, String clipPath) {
         this.mClipPath = clipPath;
@@ -59,6 +62,7 @@ public final class MediaCodecDecoder {
     }
 
     public void start() {
+        mIsFirstFrameReceived = false;
         mExtractor = new MediaExtractor();
         try {
             mExtractor.setDataSource(mClipPath);
@@ -77,7 +81,10 @@ public final class MediaCodecDecoder {
                 }
                 try {
                     Log.i(TAG, "format : " + format);
-                    format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 65536);
+                    // Enable Low Latency Mode
+                    format.setInteger("vendor.qti-ext-dec-low-latency.enable", 1);
+                    // Real Time Priority
+                    format.setInteger(MediaFormat.KEY_PRIORITY, 0);
                     mVideoDecoder.configure(format, mSurface, null, 0 /* Decode */);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -120,7 +127,6 @@ public final class MediaCodecDecoder {
             MediaCodec.BufferInfo newBufferInfo = new MediaCodec.BufferInfo();
             ByteBuffer[] inputBuffers = mVideoDecoder.getInputBuffers();
             ByteBuffer[] outputBuffers = mVideoDecoder.getOutputBuffers();
-            long startMs = System.currentTimeMillis();
 
             while (mVideoDecoderRunning) {
                 int index = mVideoDecoder.dequeueInputBuffer(1000);
@@ -130,9 +136,8 @@ public final class MediaCodecDecoder {
                     int sampleSize = mExtractor.readSampleData(inputBuffer, 0);
 
                     if (mExtractor.advance() && sampleSize > 0) {
-                        mVideoDecoder
-                                .queueInputBuffer(index, 0, sampleSize, mExtractor.getSampleTime(),
-                                        0);
+                        mVideoDecoder.queueInputBuffer(index, 0, sampleSize,
+                                mExtractor.getSampleTime(), 0);
                     } else {
                         Log.d(TAG, "InputBuffer BUFFER_FLAG_END_OF_STREAM");
                         mVideoDecoder.queueInputBuffer(
@@ -159,17 +164,22 @@ public final class MediaCodecDecoder {
                         Log.d(TAG, "INFO_TRY_AGAIN_LATER");
                         break;
                     default:
-                        // We use a very simple clock to keep the video FPS, or the video
-                        // playback will be too fast
-                        while (newBufferInfo.presentationTimeUs / 1000 >
-                                System.currentTimeMillis() - startMs) {
-                            try {
-                                sleep(10);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
                         boolean render = newBufferInfo.size != 0;
+                        if (!mIsFirstFrameReceived) {
+                            mIsFirstFrameReceived = true;
+                            mFirstSampleReceivedTimeUs = System.nanoTime() / 1000;
+                            mFirstSampleTimestampUs = newBufferInfo.presentationTimeUs;
+                        }
+                        long receivedTimeDelta = System.nanoTime() / 1000 - mFirstSampleReceivedTimeUs;
+                        long presentationTimeDelta = newBufferInfo.presentationTimeUs - mFirstSampleTimestampUs;
+
+                        try {
+                            if (presentationTimeDelta > receivedTimeDelta) {
+                                Thread.sleep((presentationTimeDelta - receivedTimeDelta) / 1000);
+                            }
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                         mVideoDecoder.releaseOutputBuffer(outIndex, render);
                 }
 

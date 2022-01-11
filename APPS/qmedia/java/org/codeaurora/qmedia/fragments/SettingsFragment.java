@@ -25,6 +25,39 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Changes from Qualcomm Innovation Center are provided under the following license:
+# Copyright (c) 2022 Qualcomm Innovation Center, Inc.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted (subject to the limitations in the
+# disclaimer below) provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above
+#      copyright notice, this list of conditions and the following
+#      disclaimer in the documentation and/or other materials provided
+#      with the distribution.
+#
+#    * Neither the name Qualcomm Innovation Center nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+#
+# NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+# GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+# HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+# GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+# IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+# IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 package org.codeaurora.qmedia.fragments;
@@ -37,6 +70,8 @@ import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -47,6 +82,7 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 import androidx.preference.PreferenceScreen;
+import androidx.preference.SwitchPreference;
 
 import org.codeaurora.qmedia.R;
 
@@ -54,10 +90,20 @@ import java.util.ArrayList;
 
 public class SettingsFragment extends PreferenceFragmentCompat
         implements SharedPreferences.OnSharedPreferenceChangeListener {
+    private static final String TAG = "SettingsFragment";
     private PreferenceScreen mPrefScreen;
+    private static final CameraCharacteristics.Key<String> CAMERA_TYPE_CHARACTERISTIC_KEY =
+            new CameraCharacteristics.Key<>("camera.type", String.class);
+    private String mHDMIinCameraID;
+    private Context mContext;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+        mContext = requireContext();
+        CameraManager manager =
+                (CameraManager) requireContext().getSystemService(Context.CAMERA_SERVICE);
+        manager.registerAvailabilityCallback(mAvailabilityCallback, new Handler());
+
         setPreferencesFromResource(R.xml.setting_preference, rootKey);
         mPrefScreen = this.getPreferenceScreen();
 
@@ -75,6 +121,28 @@ public class SettingsFragment extends PreferenceFragmentCompat
         // Update Preference
         updatePreference();
     }
+
+
+    private final CameraManager.AvailabilityCallback mAvailabilityCallback = new CameraManager.AvailabilityCallback() {
+        @Override
+        public void onCameraAvailable(@NonNull String cameraId) {
+            super.onCameraAvailable(cameraId);
+            CameraManager manager =
+                    (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+            try {
+                CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+                String cameraType = characteristics.get(CAMERA_TYPE_CHARACTERISTIC_KEY);
+                if (cameraType != null && cameraType.equals("screen_share_internal")) {
+                    Log.i(TAG, "mHDMIinCameraID is " + cameraId);
+                    mHDMIinCameraID = cameraId;
+                    populateCameraIDs();
+                    updatePreference();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    };
 
     @Override
     public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
@@ -109,6 +177,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         ListPreference decoder_instance = mPrefScreen.findPreference("hdmi_1_decoder_instance");
         ListPreference compose_view = mPrefScreen.findPreference("hdmi_1_compose_view");
         ListPreference camera_id = mPrefScreen.findPreference("hdmi_1_camera_id");
+        SwitchPreference hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_1_hdmi_in_audio_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -120,6 +189,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (camera_id.isVisible()) {
                 camera_id.setVisible(false);
             }
+            if (hdmiin_audio_enable.isVisible()) {
+                hdmiin_audio_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -130,16 +202,23 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (!camera_id.isVisible()) {
                 camera_id.setVisible(true);
             }
+            if (camera_id.getValue().equals(mHDMIinCameraID)) {
+                hdmiin_audio_enable.setVisible(true);
+            } else {
+                hdmiin_audio_enable.setVisible(false);
+            }
         } else {
             decoder_instance.setVisible(false);
             compose_view.setVisible(false);
             camera_id.setVisible(false);
+            hdmiin_audio_enable.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_2_source");
         decoder_instance = mPrefScreen.findPreference("hdmi_2_decoder_instance");
         compose_view = mPrefScreen.findPreference("hdmi_2_compose_view");
         camera_id = mPrefScreen.findPreference("hdmi_2_camera_id");
+        hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_2_hdmi_in_audio_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -151,6 +230,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (camera_id.isVisible()) {
                 camera_id.setVisible(false);
             }
+            if (hdmiin_audio_enable.isVisible()) {
+                hdmiin_audio_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -161,16 +243,23 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (!camera_id.isVisible()) {
                 camera_id.setVisible(true);
             }
+            if (camera_id.getValue().equals(mHDMIinCameraID)) {
+                hdmiin_audio_enable.setVisible(true);
+            } else {
+                hdmiin_audio_enable.setVisible(false);
+            }
         } else {
             decoder_instance.setVisible(false);
             compose_view.setVisible(false);
             camera_id.setVisible(false);
+            hdmiin_audio_enable.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_3_source");
         decoder_instance = mPrefScreen.findPreference("hdmi_3_decoder_instance");
         compose_view = mPrefScreen.findPreference("hdmi_3_compose_view");
         camera_id = mPrefScreen.findPreference("hdmi_3_camera_id");
+        hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_3_hdmi_in_audio_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -182,6 +271,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (camera_id.isVisible()) {
                 camera_id.setVisible(false);
             }
+            if (hdmiin_audio_enable.isVisible()) {
+                hdmiin_audio_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -192,10 +284,16 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (!camera_id.isVisible()) {
                 camera_id.setVisible(true);
             }
+            if (camera_id.getValue().equals(mHDMIinCameraID)) {
+                hdmiin_audio_enable.setVisible(true);
+            } else {
+                hdmiin_audio_enable.setVisible(false);
+            }
         } else {
             decoder_instance.setVisible(false);
             compose_view.setVisible(false);
             camera_id.setVisible(false);
+            hdmiin_audio_enable.setVisible(false);
         }
 
         // Handle Reset App Preference
@@ -243,14 +341,18 @@ public class SettingsFragment extends PreferenceFragmentCompat
 
     void populateCameraIDs() {
         CameraManager cameraManager =
-                (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
+                (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
         ArrayList<String> detectedCameras = new ArrayList<>();
         ArrayList<String> cameraIDs = new ArrayList<>();
         try {
             for (String camID : cameraManager.getCameraIdList()) {
-                detectedCameras.add(getLensOrientationString(
-                        cameraManager.getCameraCharacteristics(camID)
-                                .get(CameraCharacteristics.LENS_FACING)) + "(" + camID + ")");
+                if (camID.equals(mHDMIinCameraID)) {
+                    detectedCameras.add("HDMIin");
+                } else {
+                    detectedCameras.add(getLensOrientationString(
+                            cameraManager.getCameraCharacteristics(camID)
+                                    .get(CameraCharacteristics.LENS_FACING)) + "(" + camID + ")");
+                }
                 cameraIDs.add(camID);
             }
         } catch (CameraAccessException e) {
@@ -282,5 +384,13 @@ public class SettingsFragment extends PreferenceFragmentCompat
         PreferenceManager.setDefaultValues(getActivity(), R.xml.setting_preference, true);
         getPreferenceScreen().removeAll();
         onCreatePreferences(null, null);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        CameraManager manager =
+                (CameraManager) requireContext().getSystemService(Context.CAMERA_SERVICE);
+        manager.unregisterAvailabilityCallback(mAvailabilityCallback);
     }
 }

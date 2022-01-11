@@ -25,15 +25,50 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Changes from Qualcomm Innovation Center are provided under the following license:
+# Copyright (c) 2022 Qualcomm Innovation Center, Inc.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted (subject to the limitations in the
+# disclaimer below) provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above
+#      copyright notice, this list of conditions and the following
+#      disclaimer in the documentation and/or other materials provided
+#      with the distribution.
+#
+#    * Neither the name Qualcomm Innovation Center nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+#
+# NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+# GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+# HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+# GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+# IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+# IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 package org.codeaurora.qmedia;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
+import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
@@ -67,14 +102,15 @@ public class CameraBase {
     private Handler mBackgroundHandler;
     private CameraDevice mCameraDevice;
     private CameraCaptureSession mCaptureSession;
-    private CaptureRequest mPreviewRequest;
     private CaptureRequest.Builder mPreviewRequestBuilder;
     private SurfaceHolder mStreamSurfaceHolder;
     private Surface mRecordSurface;
     private Boolean mRecord = false;
+    private final CameraDisconnectedListener mCameraDisconnectedListener;
 
-    public CameraBase(Context context) {
+    public CameraBase(Context context, CameraDisconnectedListener cameraDisconnectedListener) {
         mCameraContext = context;
+        mCameraDisconnectedListener = cameraDisconnectedListener;
     }
 
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
@@ -82,32 +118,30 @@ public class CameraBase {
         @Override
         public void onOpened(CameraDevice cameraDevice) {
             // This method is called when the camera is opened. We start camera preview here.
+            Log.v(TAG, "onOpened Camera id: " + cameraDevice.getId());
             mCameraOpenCloseLock.release();
-            Log.d(TAG, "Camera id: " + cameraDevice.getId());
             mCameraDevice = cameraDevice;
             createAndStartCameraSession();
         }
 
         @Override
         public void onDisconnected(CameraDevice cameraDevice) {
-            mCameraOpenCloseLock.release();
-            cameraDevice.close();
-            mCameraDevice = null;
+            Log.v(TAG, "onDisconnected Called for camera # " + cameraDevice.getId());
+            mCameraDisconnectedListener.cameraDisconnected();
         }
 
         @Override
         public void onError(CameraDevice cameraDevice, int error) {
-            mCameraOpenCloseLock.release();
             Log.e(TAG, "Error" + error + " occurred on camera ID : " + cameraDevice.getId());
+            mCameraOpenCloseLock.release();
             cameraDevice.close();
             mCameraDevice = null;
         }
 
         @Override
         public void onClosed(CameraDevice camera) {
+            Log.v(TAG, "onClosed Called for camera # " + camera.getId());
             super.onClosed(camera);
-            Log.i(TAG, "onClosed Called for camera # " + camera.getId());
-            mStreamSurfaceHolder = null;
             mCameraOpenCloseLock.release();
         }
     };
@@ -118,8 +152,10 @@ public class CameraBase {
                 @Override
                 public void onConfigured(
                         @NonNull CameraCaptureSession cameraCaptureSession) {
+                    Log.v(TAG, "onConfigured");
                     // The camera is already closed
                     if (null == mCameraDevice) {
+                        Log.w(TAG, "mCameraDevice is null, returning from onConfigured");
                         return;
                     }
                     mCaptureSession = cameraCaptureSession;
@@ -127,7 +163,7 @@ public class CameraBase {
                         // Set Default Params
                         setDefaultCameraParam();
                         // Finally, we start displaying the camera preview.
-                        mPreviewRequest = mPreviewRequestBuilder.build();
+                        CaptureRequest mPreviewRequest = mPreviewRequestBuilder.build();
                         mCaptureSession.setRepeatingRequest(mPreviewRequest,
                                 null, mBackgroundHandler);
                     } catch (CameraAccessException e) {
@@ -138,18 +174,22 @@ public class CameraBase {
                 @Override
                 public void onConfigureFailed(
                         @NonNull CameraCaptureSession cameraCaptureSession) {
-                    Toast.makeText(mCameraContext.getApplicationContext(), "Failed",
+                    Log.e(TAG, "onConfigureFailed");
+                    Toast.makeText(mCameraContext.getApplicationContext(), "onConfigureFailed",
                             Toast.LENGTH_SHORT).show();
                 }
             };
 
     private void startBackgroundThread() {
+        Log.v(TAG, "startBackgroundThread enter");
         mBackgroundThread = new HandlerThread("Camera2BackgroundThread");
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+        Log.v(TAG, "startBackgroundThread exit");
     }
 
     private void stopBackgroundThread() {
+        Log.v(TAG, "stopBackgroundThread enter");
         mBackgroundThread.quitSafely();
         try {
             mBackgroundThread.join();
@@ -158,30 +198,34 @@ public class CameraBase {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        Log.v(TAG, "stopBackgroundThread exit");
     }
 
     @SuppressLint("MissingPermission")
     public void startCamera(String id) {
-
-        Log.i(TAG, "Opening Camera ID" + id);
+        Log.v(TAG, "startCamera enter");
+        Log.v(TAG, "Opening Camera ID" + id);
         CameraManager manager =
                 (CameraManager) mCameraContext.getSystemService(Context.CAMERA_SERVICE);
         try {
-            if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-                throw new RuntimeException("Time out waiting to lock camera opening.");
-            }
+            mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS);
             startBackgroundThread();
             manager.openCamera(id, mStateCallback, mBackgroundHandler);
+            mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
+        } finally {
+            mCameraOpenCloseLock.release();
         }
+        Log.v(TAG, "startCamera exit");
     }
 
-    public void closeCamera() {
+    public void stopCamera() {
+        Log.v(TAG, "stopCamera enter");
         if (mCameraDevice != null) {
-            Log.i(TAG, "Closing Camera ID # " + mCameraDevice.getId());
+            Log.v(TAG, "Closing Camera ID # " + mCameraDevice.getId());
         }
 
         // Clear the surface
@@ -191,7 +235,7 @@ public class CameraBase {
         }
 
         try {
-            mCameraOpenCloseLock.acquire();
+            mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS);
             if (null != mCaptureSession) {
                 mCaptureSession.close();
                 mCaptureSession = null;
@@ -207,6 +251,7 @@ public class CameraBase {
             mCameraOpenCloseLock.release();
         }
         stopBackgroundThread();
+        Log.v(TAG, "stopCamera exit");
     }
 
     public void addPreviewStream(SurfaceHolder surface) {
@@ -214,6 +259,7 @@ public class CameraBase {
     }
 
     private void createAndStartCameraSession() {
+        Log.v(TAG, "createAndStartCameraSession enter");
         try {
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
@@ -246,9 +292,11 @@ public class CameraBase {
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+        Log.v(TAG, "createAndStartCameraSession exit");
     }
 
     private void setDefaultCameraParam() {
+        Log.v(TAG, "setDefaultCameraParam enter");
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                 CaptureRequest.CONTROL_AF_MODE_OFF);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE,
@@ -262,6 +310,7 @@ public class CameraBase {
         mPreviewRequestBuilder
                 .set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
         mPreviewRequestBuilder.set(CaptureRequest.NOISE_REDUCTION_MODE, 1);
+        Log.v(TAG, "setDefaultCameraParam exit");
     }
 
     public void addRecorderStream(Surface recorderSurface) {

@@ -1,5 +1,5 @@
 /*
-# Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+# Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted (subject to the limitations in the
@@ -77,7 +77,7 @@ public class HDMIinAudioPlayback {
     }
 
     public void start() {
-
+        Log.v(TAG, "start enter");
         mAudioDeviceInfos = mAudioManager.getDevices(AudioManager.GET_DEVICES_INPUTS);
         for (AudioDeviceInfo d : mAudioDeviceInfos) {
             if (d.getType() == AudioDeviceInfo.TYPE_HDMI)
@@ -130,22 +130,25 @@ public class HDMIinAudioPlayback {
 
             mRecordThread = new Thread(new Runnable() {
                 public void run() {
+                    Log.v(TAG, "mRecordThread enter");
+                    Log.v(TAG, "Audio Record thread started.");
                     isAudioRecordThreadRunning.set(true);
                     mRecordPlaybackSemaphore.release();
-                    Log.e(TAG, "Audio Record thread started.");
                     byte[] bData = new byte[mAudioBufferBytes];
                     while (isAudioRecordThreadRunning.get()) {
-                        mAudioRecorder.read(bData, 0, mAudioBufferBytes);
+                        mAudioRecorder.read(bData, 0, mAudioBufferBytes, AudioRecord.READ_BLOCKING);
                         mAudioQueue.add(bData);
                     }
+                    Log.v(TAG, "mRecordThread exit");
                 }
             }, "Audio Record Thread");
             mRecordThread.start();
             mPlaybackThread = new Thread(new Runnable() {
                 public void run() {
+                    Log.v(TAG, "mPlaybackThread enter");
+                    Log.v(TAG, "Audio Playback thread started.");
                     isAudioPlaybackThreadRunning.set(true);
                     mRecordPlaybackSemaphore.release();
-                    Log.e(TAG, "Audio Playback thread started.");
                     while (isAudioPlaybackThreadRunning.get()) {
                         if (!mAudioQueue.isEmpty()) {
                             byte[] bData = mAudioQueue.remove();
@@ -153,13 +156,16 @@ public class HDMIinAudioPlayback {
                         }
                     }
                     mRecordPlaybackSemaphore.release();
+                    Log.v(TAG, "mPlaybackThread exit");
                 }
             }, "Audio Playback Thread");
             mPlaybackThread.start();
         }
+        Log.v(TAG, "start exit");
     }
 
     public void stop() {
+        Log.v(TAG, "stop enter");
         if (mHDMIDevice != null) {
             try {
                 mHDMIDevice = null;
@@ -193,5 +199,6 @@ public class HDMIinAudioPlayback {
                 e.printStackTrace();
             }
         }
+        Log.v(TAG, "stop exit");
     }
 }

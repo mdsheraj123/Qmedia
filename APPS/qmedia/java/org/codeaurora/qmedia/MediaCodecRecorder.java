@@ -25,6 +25,39 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Changes from Qualcomm Innovation Center are provided under the following license:
+# Copyright (c) 2022 Qualcomm Innovation Center, Inc.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted (subject to the limitations in the
+# disclaimer below) provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above
+#      copyright notice, this list of conditions and the following
+#      disclaimer in the documentation and/or other materials provided
+#      with the distribution.
+#
+#    * Neither the name Qualcomm Innovation Center nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+#
+# NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+# GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+# HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+# GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+# IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+# IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 package org.codeaurora.qmedia;
@@ -98,6 +131,7 @@ public class MediaCodecRecorder {
     private int mRecorderAudioEncoding;
 
     public MediaCodecRecorder(Context context, int width, int height, boolean audio_enabled) {
+        Log.v(TAG, "MediaCodecRecorder enter");
         this.mContext = context;
         this.mIsAudioEnabled = audio_enabled;
         this.mVideoFormat = MediaFormat.createVideoFormat("video/avc", width, height);
@@ -187,11 +221,12 @@ public class MediaCodecRecorder {
                         mRecorderChannels == AudioFormat.CHANNEL_IN_STEREO ? 2 : 1);
                 mAudioFormat.setInteger(MediaFormat.KEY_BIT_RATE, AUDIO_BITRATE);
             }
-
         }
+        Log.v(TAG, "MediaCodecRecorder exit");
     }
 
     private MediaCodec createVideoEncoder() {
+        Log.v(TAG, "createVideoEncoder");
         MediaCodec obj = null;
         try {
             obj = MediaCodec.createEncoderByType("video/avc");
@@ -204,6 +239,7 @@ public class MediaCodecRecorder {
     }
 
     private MediaCodec createAudioIOEncoder() {
+        Log.v(TAG, "createAudioIOEncoder");
         MediaCodec obj = null;
         try {
             obj = MediaCodec.createEncoderByType(AUDIO_MIME_TYPE);
@@ -215,24 +251,29 @@ public class MediaCodecRecorder {
     }
 
     private MediaMuxer createMuxer() throws IOException {
+        Log.v(TAG, "createMuxer");
         mMuxerCreated = true;
         return new MediaMuxer(createVideoFile(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
     }
 
     private void releaseVideoEncoder() {
+        Log.v(TAG, "releaseVideoEncoder enter");
         this.mVideoEncoderRunning = false;
         this.mVideoEncoder.stop();
         this.mVideoEncoder.release();
+        Log.v(TAG, "releaseVideoEncoder exit");
     }
 
     private void releaseAudioEncoder() {
+        Log.v(TAG, "releaseAudioEncoder enter");
         mAudioEncoderRunning.set(false);
         mAudioEncoder.stop();
         mAudioEncoder.release();
+        Log.v(TAG, "releaseAudioEncoder exit");
     }
 
     private void releaseMuxer() {
-        Log.i(TAG, "releaseMuxer");
+        Log.v(TAG, "releaseMuxer enter");
         if (this.mMuxerStarted) {
             this.mMuxer.stop();
         }
@@ -244,10 +285,11 @@ public class MediaCodecRecorder {
         this.mMuxerCreated = false;
         this.mMuxerStarted = false;
         this.mMuxerTrackCount = 0;
+        Log.v(TAG, "releaseMuxer exit");
     }
 
     public void start(int orientation) {
-        Log.i(TAG, "start enter");
+        Log.v(TAG, "start enter");
         try {
             mMuxer = createMuxer();
         } catch (IOException e) {
@@ -272,11 +314,11 @@ public class MediaCodecRecorder {
             mAudioRecorderThread.start();
         }
 
-        Log.i(TAG, "start exit");
+        Log.v(TAG, "start exit");
     }
 
     public void stop() {
-        Log.i(TAG, "stop enter");
+        Log.v(TAG, "stop enter");
         mVideoEncoderRunning = false;
         try {
             mVideoEncoderThread.join();
@@ -287,14 +329,14 @@ public class MediaCodecRecorder {
         if (mIsAudioEnabled) {
             mAudioRecorderRunning.set(false);
             try {
-                mAudioEncoderThread.join();
                 mAudioRecorderThread.join();
+                mAudioEncoderThread.join();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
         releaseMuxer();
-        Log.i(TAG, "stop exit");
+        Log.v(TAG, "stop exit");
     }
 
     public final Surface getRecorderSurface() {
@@ -302,12 +344,13 @@ public class MediaCodecRecorder {
     }
 
     private FileDescriptor createVideoFile() {
+        Log.v(TAG, "createVideoFile");
         long dateTaken = System.currentTimeMillis();
         String filename = "VID_" +
                 (new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss_SSS", Locale.US)).format(new Date()) +
                 ".mp4";
 
-        Log.d(TAG, "Recorder output file: " + filename);
+        Log.i(TAG, "Recorder output file: " + filename);
         ContentValues values = new ContentValues();
         values.put(Media.TITLE, filename);
         values.put(Media.DISPLAY_NAME, filename);
@@ -325,7 +368,6 @@ public class MediaCodecRecorder {
 
         assert file != null;
         return file.getFileDescriptor();
-
     }
 
     class VideoEncoderThread extends Thread {
@@ -337,6 +379,7 @@ public class MediaCodecRecorder {
 
         //method where the thread execution will start
         public void run() {
+            Log.v(TAG, "VideoEncoderThread enter");
             mVideoEncoderRunning = true;
             ByteBuffer[] encoderOutputBuffers = mVideoEncoder.getOutputBuffers();
             while (mVideoEncoderRunning) {
@@ -380,7 +423,7 @@ public class MediaCodecRecorder {
                     if (bufferInfo.size != 0 && mMuxerStarted) {
                         if (mIsFirstTime) {
                             mIsFirstTime = false;
-                            Log.e(TAG, "First Video Frame received.");
+                            Log.i(TAG, "First Video Frame received.");
                         }
                         encodedData.position(bufferInfo.offset);
                         encodedData.limit(bufferInfo.offset + bufferInfo.size);
@@ -402,6 +445,7 @@ public class MediaCodecRecorder {
                 }
             }
             releaseVideoEncoder();
+            Log.v(TAG, "VideoEncoderThread exit");
         }
     }
 
@@ -414,6 +458,7 @@ public class MediaCodecRecorder {
 
         //method where the thread execution will start
         public void run() {
+            Log.v(TAG, "AudioEncoderThread enter");
             mAudioEncoderRunning.set(true);
             ByteBuffer[] encoderOutputBuffers = mAudioEncoder.getOutputBuffers();
             long oldTimeStampUs = 0;
@@ -463,8 +508,8 @@ public class MediaCodecRecorder {
                 }
             }
             releaseAudioEncoder();
+            Log.v(TAG, "AudioEncoderThread exit");
         }
-
     }
 
     class AudioRecorderThread extends Thread {
@@ -476,6 +521,7 @@ public class MediaCodecRecorder {
 
         @Override
         public void run() {
+            Log.v(TAG, "AudioRecorderThread enter");
             mAudioRecorderRunning.set(true);
             ByteBuffer[] encoderInputBuffers = mAudioEncoder.getInputBuffers();
             while (mAudioRecorderRunning.get()) {
@@ -507,6 +553,7 @@ public class MediaCodecRecorder {
             }
             mAudioRecord.stop();
             mAudioEncoderRunning.set(false);
+            Log.v(TAG, "AudioRecorderThread exit");
         }
     }
 }

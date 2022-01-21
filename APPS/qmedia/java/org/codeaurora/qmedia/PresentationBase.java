@@ -170,14 +170,14 @@ public class PresentationBase extends Presentation implements CameraDisconnected
             mSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
                 public void surfaceCreated(SurfaceHolder holder) {
                     Log.d(TAG, "surfaceCreated  for Camera");
-                    mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
-                    mCameraBase.addPreviewStream(holder);
                     if (mData.getIsHDMIinCameraEnabled(mPresentationIndex)) {
                         mHDMIinSurfaceHolder = holder;
                         CameraManager manager =
                                 (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
                         manager.registerAvailabilityCallback(mAvailabilityCallback, mAvailabilityCallbackHandler);
                     } else {
+                        mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
+                        mCameraBase.addPreviewStream(holder);
                         holder.setFixedSize(1920, 1080);
                     }
                 }
@@ -233,6 +233,8 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                             mActivity.runOnUiThread(() -> {
                                 mHDMIinSurfaceHolder.setFixedSize(resolution[0].getWidth(), resolution[0].getHeight());
                             });
+                            mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
+                            mCameraBase.addPreviewStream(mHDMIinSurfaceHolder);
                             mMediaCodecRecorder = new MediaCodecRecorder(getContext(), resolution[0].getWidth(),
                                     resolution[0].getHeight(), mData.getIsHDMIinAudioEnabled(mPresentationIndex));
                             mCameraBase.addRecorderStream(mMediaCodecRecorder.getRecorderSurface());

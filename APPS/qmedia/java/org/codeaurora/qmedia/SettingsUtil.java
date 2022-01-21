@@ -64,6 +64,7 @@ package org.codeaurora.qmedia;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.util.Log;
@@ -104,18 +105,21 @@ public class SettingsUtil {
         hdmi_1_setting.composeType = pref.getString("hdmi_1_compose_view", "SF");
         hdmi_1_setting.camID = pref.getString("hdmi_1_camera_id", "0");
 
-        String cameraType = null;
+        hdmi_1_setting.isHDMIinCameraEnabled = true;
         try {
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(hdmi_1_setting.camID);
-            cameraType = characteristics.get(CAMERA_TYPE_CHARACTERISTIC_KEY);
+            for (String camID : manager.getCameraIdList()) {
+                if (camID.equals(hdmi_1_setting.camID)) {
+                    CameraCharacteristics characteristics = manager.getCameraCharacteristics(hdmi_1_setting.camID);
+                    String cameraType = characteristics.get(CAMERA_TYPE_CHARACTERISTIC_KEY);
+                    if (cameraType == null || !cameraType.equals("screen_share_internal")) {
+                        hdmi_1_setting.isHDMIinCameraEnabled = false;
+                    }
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        if (cameraType != null && cameraType.equals("screen_share_internal")) {
-            hdmi_1_setting.isHDMIinCameraEnabled = true;
-        } else {
-            hdmi_1_setting.isHDMIinCameraEnabled = false;
-        }
+
         hdmi_1_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_1_hdmi_in_audio_enable", false);
 
         data.add(hdmi_1_setting);
@@ -127,17 +131,21 @@ public class SettingsUtil {
         hdmi_2_setting.composeType = pref.getString("hdmi_2_compose_view", "SF");
         hdmi_2_setting.camID = pref.getString("hdmi_2_camera_id", "0");
 
+        hdmi_2_setting.isHDMIinCameraEnabled = true;
         try {
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(hdmi_2_setting.camID);
-            cameraType = characteristics.get(CAMERA_TYPE_CHARACTERISTIC_KEY);
+            for (String camID : manager.getCameraIdList()) {
+                if (camID.equals(hdmi_2_setting.camID)) {
+                    CameraCharacteristics characteristics = manager.getCameraCharacteristics(hdmi_2_setting.camID);
+                    String cameraType = characteristics.get(CAMERA_TYPE_CHARACTERISTIC_KEY);
+                    if (cameraType == null || !cameraType.equals("screen_share_internal")) {
+                        hdmi_2_setting.isHDMIinCameraEnabled = false;
+                    }
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        if (cameraType != null && cameraType.equals("screen_share_internal")) {
-            hdmi_2_setting.isHDMIinCameraEnabled = true;
-        } else {
-            hdmi_2_setting.isHDMIinCameraEnabled = false;
-        }
+
         hdmi_2_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_2_hdmi_in_audio_enable", false);
 
         data.add(hdmi_2_setting);
@@ -149,17 +157,21 @@ public class SettingsUtil {
         hdmi_3_setting.composeType = pref.getString("hdmi_3_compose_view", "SF");
         hdmi_3_setting.camID = pref.getString("hdmi_3_camera_id", "0");
 
+        hdmi_3_setting.isHDMIinCameraEnabled = true;
         try {
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(hdmi_3_setting.camID);
-            cameraType = characteristics.get(CAMERA_TYPE_CHARACTERISTIC_KEY);
+            for (String camID : manager.getCameraIdList()) {
+                if (camID.equals(hdmi_3_setting.camID)) {
+                    CameraCharacteristics characteristics = manager.getCameraCharacteristics(hdmi_3_setting.camID);
+                    String cameraType = characteristics.get(CAMERA_TYPE_CHARACTERISTIC_KEY);
+                    if (cameraType == null || !cameraType.equals("screen_share_internal")) {
+                        hdmi_3_setting.isHDMIinCameraEnabled = false;
+                    }
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        if (cameraType != null && cameraType.equals("screen_share_internal")) {
-            hdmi_3_setting.isHDMIinCameraEnabled = true;
-        } else {
-            hdmi_3_setting.isHDMIinCameraEnabled = false;
-        }
+
         hdmi_3_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_3_hdmi_in_audio_enable", false);
 
         data.add(hdmi_3_setting);

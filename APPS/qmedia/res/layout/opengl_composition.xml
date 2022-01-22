@@ -36,8 +36,8 @@
 
     <SurfaceView
         android:id="@+id/primary_surface_view"
-        android:layout_width="1280px"
-        android:layout_height="720px"
+        android:layout_width="1920px"
+        android:layout_height="1080px"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

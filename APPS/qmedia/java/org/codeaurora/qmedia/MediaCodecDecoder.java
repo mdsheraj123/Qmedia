@@ -25,6 +25,39 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Changes from Qualcomm Innovation Center are provided under the following license:
+# Copyright (c) 2022 Qualcomm Innovation Center, Inc.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted (subject to the limitations in the
+# disclaimer below) provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above
+#      copyright notice, this list of conditions and the following
+#      disclaimer in the documentation and/or other materials provided
+#      with the distribution.
+#
+#    * Neither the name Qualcomm Innovation Center nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+#
+# NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+# GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+# HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+# GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+# IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+# IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 package org.codeaurora.qmedia;
 
@@ -62,6 +95,7 @@ public final class MediaCodecDecoder {
     }
 
     public void start() {
+        Log.v(TAG, "start enter");
         mIsFirstFrameReceived = false;
         mExtractor = new MediaExtractor();
         try {
@@ -95,10 +129,12 @@ public final class MediaCodecDecoder {
         mVideoDecoder.start();
         mVideoDecoderThread = new videoDecoderHandler(false);
         mVideoDecoderThread.start();
+        Log.v(TAG, "start exit");
     }
 
 
     public void stop() {
+        Log.v(TAG, "stop enter");
         mVideoDecoderRunning = false;
         try {
             mVideoDecoderThread.join();
@@ -110,6 +146,7 @@ public final class MediaCodecDecoder {
             mSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
             mSurfaceHolder.setFormat(PixelFormat.OPAQUE);
         }
+        Log.v(TAG, "stop exit");
     }
 
 
@@ -122,6 +159,7 @@ public final class MediaCodecDecoder {
 
         //method where the thread execution will start
         public void run() {
+            Log.v(TAG, "videoDecoderHandler enter");
             //logic to execute in a thread
             mVideoDecoderRunning = true;
             MediaCodec.BufferInfo newBufferInfo = new MediaCodec.BufferInfo();
@@ -135,19 +173,15 @@ public final class MediaCodecDecoder {
                     ByteBuffer inputBuffer = inputBuffers[index];
                     int sampleSize = mExtractor.readSampleData(inputBuffer, 0);
 
-                    if (mExtractor.advance() && sampleSize > 0) {
+                    if (sampleSize >= 0) {
                         mVideoDecoder.queueInputBuffer(index, 0, sampleSize,
                                 mExtractor.getSampleTime(), 0);
                     } else {
                         Log.d(TAG, "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-                        mVideoDecoder.queueInputBuffer(
-                                index,
-                                0,
-                                0,
-                                0,
-                                MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                        );
+                        mVideoDecoder.queueInputBuffer(index, 0, 0,
+                                0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                     }
+                    mExtractor.advance();
                 }
                 int outIndex = mVideoDecoder.dequeueOutputBuffer(newBufferInfo, 1000);
 
@@ -196,7 +230,7 @@ public final class MediaCodecDecoder {
             mVideoDecoder.stop();
             mVideoDecoder.release();
             mExtractor.release();
+            Log.v(TAG, "videoDecoderHandler exit");
         }
     }
-
 }

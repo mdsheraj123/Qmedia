@@ -27,6 +27,41 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+# Changes from Qualcomm Innovation Center are provided under the following license :
+# Copyright(c) 2022 Qualcomm Innovation Center, Inc.
+#
+# Redistributionand use in sourceand binary forms, with or without
+# modification, are permitted(subject to the limitations in the
+# disclaimer below) provided that the following conditions are met :
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditionsand the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above
+#      copyright notice, this list of conditionsand the following
+#      disclaimer in the documentationand /or other materials provided
+#      with the distribution.
+#
+#    * Neither the name Qualcomm Innovation Center nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+#
+# NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+# GRANTED BY THIS LICENSE.THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+# HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+# GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+# IN CONTRACT, STRICT LIABILITY, OR TORT(INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+# IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #include "umd-camera.h"
 #include "umd-logging.h"
 
@@ -48,6 +83,8 @@ const uint32_t AUDIO_RECORDER_PERIOD_COUNT = 4;
 const uint32_t AUDIO_RECORDER_NUM_CHANNELS = 2;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 
+umd_pan_tilt_t UmdCamera::umd_current_pan_and_tilt = 0;
+
 UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev, int cameraId)
   : mGadget(nullptr),
     mVsetup({}),
@@ -67,7 +104,8 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
     mClientCb({}),
     mLastFrameNumber(-1),
     mVideoBufferQueue(VIDEO_BUFFER_TIMEOUT),
-    mAudioRecorder(nullptr) {}
+    mAudioRecorder(nullptr),
+    mCtrlValues({}) {}
 
 UmdCamera::~UmdCamera() {
   mActive = false;
@@ -86,6 +124,7 @@ UmdCamera::~UmdCamera() {
   if (nullptr != mAllocDeviceInterface) {
     AllocDeviceFactory::DestroyAllocDevice(mAllocDeviceInterface);
   }
+
 }
 
 int32_t UmdCamera::Initialize() {
@@ -139,6 +178,8 @@ int32_t UmdCamera::Initialize() {
     UMD_LOG_ERROR ("Camera CreateDefaultRequest failed!\n");
     return ret;
   }
+
+  FillInitialControlValue();
 
   mGadget = umd_gadget_new (mUvcDev.c_str(), mUacDev.c_str(), &mUmdVideoCallbacks, this);
   if (nullptr == mGadget) {
@@ -227,14 +268,9 @@ bool UmdCamera::InitCameraParamsLocked() {
     return false;
   }
 
-  uint32_t tag = GetVendorTagByName (
-      "org.codeaurora.qcamera3.iso_exp_priority", "use_iso_exp_priority");
-  if (tag != 0) {
-    int64_t isomode = 0; // ISO_MODE_AUTO
-    meta.update(tag, &isomode, 1);
-  }
+  SetDefaultControlValues(meta);
 
-  if (!SetCameraMetadataLocked(meta)) {
+  if (!SetCameraMetadataLocked(meta, false)) {
     UMD_LOG_ERROR("Set camera metadata failed!\n");
     return false;
   }
@@ -353,7 +389,7 @@ void UmdCamera::SetAntibanding(CameraMetadata & meta, uint8_t value) {
   meta.update(ANDROID_CONTROL_AE_ANTIBANDING_MODE, &mode, 1);
 }
 
-void UmdCamera::GetAntibanding(CameraMetadata & meta, uint8_t * value) {
+bool UmdCamera::GetAntibanding(CameraMetadata & meta, uint8_t * value) {
   if (meta.exists(ANDROID_CONTROL_AE_ANTIBANDING_MODE)) {
     uint8_t mode = meta.find(ANDROID_CONTROL_AE_ANTIBANDING_MODE).data.u8[0];
     switch (mode) {
@@ -371,9 +407,12 @@ void UmdCamera::GetAntibanding(CameraMetadata & meta, uint8_t * value) {
         break;
       default:
         UMD_LOG_ERROR ("Unsupported Antibanding mode: %d!\n", mode);
-        return;
+        return false;
     }
+  } else {
+      return false;
   }
+  return true;
 }
 
 void UmdCamera::SetISO(CameraMetadata & meta, uint16_t value) {
@@ -410,12 +449,14 @@ void UmdCamera::SetWbTemperature(CameraMetadata & meta, uint16_t value) {
    }
 }
 
-void UmdCamera::GetWbTemperature(CameraMetadata & meta, uint16_t * value) {
+bool UmdCamera::GetWbTemperature(CameraMetadata & meta, uint16_t * value) {
   uint32_t tag = GetVendorTagByName(
       "org.codeaurora.qcamera3.manualWB", "color_temperature");
    if (tag != 0 && meta.exists(tag)) {
      *value = static_cast<uint16_t>(meta.find(tag).data.i32[0]);
+     return true;
    }
+   return false;
 }
 
 void UmdCamera::SetWbMode(CameraMetadata & meta, uint8_t value) {
@@ -439,7 +480,7 @@ void UmdCamera::SetWbMode(CameraMetadata & meta, uint8_t value) {
   }
 }
 
-void UmdCamera::GetWbMode(CameraMetadata & meta, uint8_t * value) {
+bool UmdCamera::GetWbMode(CameraMetadata & meta, uint8_t * value) {
     uint32_t tag = GetVendorTagByName (
       "org.codeaurora.qcamera3.manualWB", "partial_mwb_mode");
   if (tag != 0 && meta.exists(tag)) {
@@ -453,9 +494,12 @@ void UmdCamera::GetWbMode(CameraMetadata & meta, uint8_t * value) {
         break;
       default:
         UMD_LOG_ERROR ("Unsupported WB mode: %d!\n", mode);
-        break;
+        return false;
     }
+  } else {
+      return false;
   }
+  return true;
 }
 
 void UmdCamera::SetExposureTime(CameraMetadata & meta, uint32_t exposure) {
@@ -487,7 +531,7 @@ void UmdCamera::SetExposureMode(CameraMetadata & meta, uint8_t mode) {
   meta.update(ANDROID_CONTROL_AE_MODE, &exposure_mode, 1);
 }
 
-void UmdCamera::GetExposureMode(CameraMetadata & meta, uint8_t * mode)
+bool UmdCamera::GetExposureMode(CameraMetadata & meta, uint8_t * mode)
 {
   if (meta.exists(ANDROID_CONTROL_AE_MODE)) {
     uint8_t ae_mode = meta.find(ANDROID_CONTROL_AE_MODE).data.u8[0];
@@ -496,7 +540,10 @@ void UmdCamera::GetExposureMode(CameraMetadata & meta, uint8_t * mode)
     } else if (ae_mode == ANDROID_CONTROL_AE_MODE_OFF) {
       *mode = UMD_VIDEO_EXPOSURE_MODE_SHUTTER;
     }
+  } else {
+      return false;
   }
+  return true;
 }
 
 void UmdCamera::SetFocusMode(CameraMetadata & meta, uint8_t value) {
@@ -515,7 +562,7 @@ void UmdCamera::SetFocusMode(CameraMetadata & meta, uint8_t value) {
   meta.update(ANDROID_CONTROL_AF_MODE, &mode, 1);
 }
 
-void UmdCamera::GetFocusMode(CameraMetadata & meta, uint8_t * value) {
+bool UmdCamera::GetFocusMode(CameraMetadata & meta, uint8_t * value) {
   if (meta.exists(ANDROID_CONTROL_AF_MODE)) {
     uint8_t mode = meta.find(ANDROID_CONTROL_AF_MODE).data.u8[0];
     switch (mode) {
@@ -527,43 +574,73 @@ void UmdCamera::GetFocusMode(CameraMetadata & meta, uint8_t * value) {
         break;
       default:
         UMD_LOG_ERROR ("Unsupported Focus mode: %d!\n", mode);
-        return;
+        return false;
     }
+  }else {
+      return false;
   }
+  return true;
 }
 
-void UmdCamera::SetZoom(CameraMetadata & meta, uint16_t magnification,
-    int32_t pan, int32_t tilt) {
+void UmdCamera::SetZoom(CameraMetadata& meta, uint16_t* in_magnification,
+  umd_pan_tilt_t* pan_and_tilt, UVCControlValues& ctrl_vals) {
 
   int32_t sensor_x = 0, sensor_y = 0, sensor_w = 0, sensor_h = 0;
-  int32_t crop[4];
+  int32_t zoom[4] = { 0 };
+  static int32_t pan = 0, tilt = 0;
+  uint16_t magnification = 0;
+
+  if (pan_and_tilt) {
+    pan = UMD_VIDEO_CTRL_GET_PAN(*pan_and_tilt);
+    tilt = UMD_VIDEO_CTRL_GET_TILT(*pan_and_tilt);
+    umd_current_pan_and_tilt = *pan_and_tilt;
+  }
+  else {
+    pan = UMD_VIDEO_CTRL_GET_PAN(umd_current_pan_and_tilt);
+    tilt = UMD_VIDEO_CTRL_GET_TILT(umd_current_pan_and_tilt);
+  }
+
+  if (in_magnification) {
+    magnification = *in_magnification;
+  } else {
+    GetZoom(meta, &magnification);
+  }
 
   if (mStaticInfo.exists(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE)) {
     sensor_x =
-        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[0];
+      mStaticInfo.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[0];
     sensor_y =
-        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[1];
+      mStaticInfo.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[1];
     sensor_w =
-        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[2];
+      mStaticInfo.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[2];
     sensor_h =
-        mStaticInfo.find (ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[3];
-
-    int32_t zoom_w = (sensor_w - sensor_x) / (magnification / 100.0);
-    int32_t zoom_h = (sensor_h - sensor_y) / (magnification / 100.0);
-
-    int32_t zoom_x = ((sensor_w - sensor_x) - zoom_w) / 2;
-    zoom_x += zoom_x * pan / (100.0 * 3600);
-
-    int32_t zoom_y = ((sensor_h - sensor_y) - zoom_h) / 2;
-    zoom_y += zoom_y * tilt / (100.0 * 3600);
-
-    crop[0] = zoom_x;
-    crop[1] = zoom_y;
-    crop[2] = zoom_w;
-    crop[3] = zoom_h;
-
-    meta.update(ANDROID_SCALER_CROP_REGION, crop, 4);
+      mStaticInfo.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE).data.i32[3];
   }
+
+  int32_t zoom_w = (sensor_w - sensor_x) / (magnification / 100.0);
+  int32_t zoom_h = (sensor_h - sensor_y) / (magnification / 100.0);
+
+  umd_pan_tilt_t pan_min = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_min);
+  umd_pan_tilt_t pan_max = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_max);
+
+  float pan_steps = (pan_max - pan_min) / 2.0;
+
+  int32_t zoom_x = ((sensor_w - sensor_x) - zoom_w) / 2;
+  zoom_x += (zoom_x * pan) / pan_steps;
+
+  umd_pan_tilt_t tilt_min = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_min);
+  umd_pan_tilt_t tilt_max = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_max);
+  float tilt_steps = (tilt_max - tilt_min) / 2.0;
+
+  int32_t zoom_y = ((sensor_h - sensor_y) - zoom_h) / 2;
+  zoom_y += (zoom_y * tilt) / tilt_steps;
+
+  zoom[0] = zoom_x;
+  zoom[1] = zoom_y;
+  zoom[2] = zoom_w;
+  zoom[3] = zoom_h;
+
+  meta.update(ANDROID_SCALER_CROP_REGION, zoom, 4);
 }
 
 void UmdCamera::GetZoom(CameraMetadata & meta, uint16_t * magnification) {
@@ -598,219 +675,364 @@ void UmdCamera::GetZoom(CameraMetadata & meta, uint16_t * magnification) {
 }
 
 bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
-                                   void * payload, void * userdata) {
+  void* payload, void* userdata) {
 
-  UmdCamera *ctx = static_cast<UmdCamera*>(userdata);
+  UmdCamera* ctx = static_cast<UmdCamera*>(userdata);
   CameraMetadata metadata;
   if (!ctx->GetCameraMetadata(metadata)) {
     return false;
   }
 
-  UMD_LOG_INFO ("Control: 0x%X, Request: 0x%X\n", id, request);
+  UMD_LOG_INFO("Control: 0x%X, Request: 0x%X\n", id, request);
 
   switch (id) {
-    case UMD_VIDEO_CTRL_BRIGHTNESS:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetExposureCompensation(metadata, *((int16_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetExposureCompensation(metadata, (int16_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
+  case UMD_VIDEO_CTRL_BRIGHTNESS: {
+    umd_brightness_t* value = (umd_brightness_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetExposureCompensation(metadata, *value);
       break;
-    case UMD_VIDEO_CTRL_CONTRAST:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetContrast(metadata, *((uint16_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetContrast(metadata, (uint16_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetExposureCompensation(metadata, value);
       break;
-    case UMD_VIDEO_CTRL_SATURATION:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetSaturation(metadata, *((uint16_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetSaturation(metadata, (uint16_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.brightness_min;
       break;
-    case UMD_VIDEO_CTRL_SHARPNESS:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetSharpness (metadata, *((uint16_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetSharpness (metadata, (uint16_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.brightness_max;
       break;
-    case UMD_VIDEO_CTRL_BACKLIGHT_COMPENSATION:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetADRC (metadata, *((uint16_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetADRC (metadata, (uint16_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_ANTIBANDING:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetAntibanding (metadata, *((uint8_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetAntibanding (metadata, (uint8_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_GAIN:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetISO (metadata, *((uint16_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetISO (metadata, (uint16_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_WB_TEMPERTURE:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetWbTemperature (metadata, *((uint16_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetWbTemperature (metadata, (uint16_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_WB_MODE:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetWbMode (metadata, *((uint8_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetWbMode (metadata, (uint8_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_EXPOSURE_TIME:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetExposureTime (metadata, *((uint32_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetExposureTime (metadata, (uint32_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_EXPOSURE_MODE:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetExposureMode (metadata, *((uint8_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetExposureMode (metadata, (uint8_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_EXPOSURE_PRIORITY:
-      break;
-    case UMD_VIDEO_CTRL_FOCUS_MODE:
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          ctx->SetFocusMode (metadata, *((uint8_t*) payload));
-          break;
-        case UMD_CTRL_GET_REQUEST:
-          ctx->GetFocusMode (metadata, (uint8_t*) payload);
-          break;
-        default:
-          UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
-          break;
-      }
-      break;
-    case UMD_VIDEO_CTRL_ZOOM:
-    case UMD_VIDEO_CTRL_PANTILT:
-      static int32_t pan = 0, tilt = 0;
-      static uint16_t magnification = 100;
-      switch (request) {
-        case UMD_CTRL_SET_REQUEST:
-          if (id == UMD_VIDEO_CTRL_ZOOM)
-            magnification = *((uint16_t*) payload);
-
-          if (id == UMD_VIDEO_CTRL_PANTILT) {
-            uint8_t *data = (uint8_t*) payload;
-
-            pan = (int32_t) data[0] | (data[1] << 8) | (data[2] << 16) |
-                (data[3] << 24);
-            tilt = (int32_t) data[4] | (data[5] << 8) | (data[6] << 16) |
-                (data[7] << 24);
-          }
-          ctx->SetZoom (metadata, magnification, pan, tilt);
-          break;
-        case UMD_CTRL_GET_REQUEST:
-            ctx->GetZoom (metadata, &magnification);
-
-            if (id == UMD_VIDEO_CTRL_ZOOM)
-              *((uint16_t*) payload) = magnification;
-
-            if (id == UMD_VIDEO_CTRL_PANTILT) {
-              uint8_t *data = (uint8_t*) payload;
-
-              data[0] = pan & 0xFF;
-              data[1] = (pan >> 8) & 0xFF;
-              data[2] = (pan >> 16) & 0xFF;
-              data[3] = (pan >> 24) & 0xFF;
-
-              data[4] = tilt & 0xFF;
-              data[5] = (tilt >> 8) & 0xFF;
-              data[6] = (tilt >> 16) & 0xFF;
-              data[7] = (tilt >> 24) & 0xFF;
-           }
-           break;
-      }
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.brightness_def;
       break;
     default:
-      UMD_LOG_ERROR("Unknown control request 0x%X!\n", id);
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_CONTRAST: {
+    umd_contrast_t* value = (umd_contrast_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetContrast(metadata, *value);
       break;
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetContrast(metadata, value);
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.contrast_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.contrast_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.contrast_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_SATURATION: {
+    umd_saturation_t* value = (umd_saturation_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetSaturation(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetSaturation(metadata, value);
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.saturation_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.saturation_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.saturation_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_SHARPNESS: {
+    umd_sharpness_t* value = (umd_sharpness_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetSharpness(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetSharpness(metadata, value);
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.sharpness_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.sharpness_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.sharpness_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_BACKLIGHT_COMPENSATION: {
+    umd_backlight_comp_t* value = (umd_backlight_comp_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetADRC(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetADRC(metadata, value);
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.backlight_comp_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.backlight_comp_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.backlight_comp_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_ANTIBANDING: {
+    umd_antibanding_t* value = (umd_antibanding_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetAntibanding(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      if (!ctx->GetAntibanding(metadata, value)) {
+        *value = ctx->mCtrlValues.antibanding_def;
+        ctx->SetAntibanding(metadata, *value);
+      }
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.antibanding_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_GAIN: {
+    umd_gain_t* value = (umd_gain_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetISO(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetISO(metadata, value);
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.gain_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.gain_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.gain_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_WB_TEMPERTURE: {
+    umd_wb_temp_t* value = (umd_wb_temp_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetWbTemperature(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      if (!ctx->GetWbTemperature(metadata, value)) {
+        *value = ctx->mCtrlValues.wb_temp_def;
+        ctx->SetWbTemperature(metadata, *value);
+      }
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.wb_temp_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.wb_temp_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.wb_temp_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_WB_MODE: {
+    umd_wb_mode_t* value = (umd_wb_mode_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetWbMode(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      if (!ctx->GetWbMode(metadata, value)) {
+        *value = ctx->mCtrlValues.wb_mode_def;
+        ctx->SetWbMode(metadata, *value);
+      }
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.wb_mode_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_EXPOSURE_TIME: {
+    umd_exp_time_t* value = (umd_exp_time_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetExposureTime(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetExposureTime(metadata, value);
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.exp_time_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.exp_time_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.exp_time_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_EXPOSURE_MODE: {
+    umd_exp_mode_t* value = (umd_exp_mode_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetExposureMode(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      if (!ctx->GetExposureMode(metadata, value)) {
+        *value = ctx->mCtrlValues.exp_mode_def;
+        ctx->SetExposureMode(metadata, *value);
+      }
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.exp_mode_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_EXPOSURE_PRIORITY: {
+    umd_exp_priority_t* value = (umd_exp_priority_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      if (*value == UMD_VIDEO_EXPOSURE_PRIORITY_CONSTANT) {
+        UMD_LOG_ERROR("No Support for Exposure Priority\n");
+      }
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      *value = UMD_VIDEO_EXPOSURE_PRIORITY_CONSTANT;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_FOCUS_MODE: {
+    umd_exp_focus_mode_t* value = (umd_exp_focus_mode_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetFocusMode(metadata, *value);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      if (!ctx->GetFocusMode(metadata, value)) {
+        *value = ctx->mCtrlValues.exp_focus_mode_def;
+        ctx->SetFocusMode(metadata, *value);
+      }
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.exp_focus_mode_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_ZOOM: {
+    umd_zoom_t* value = (umd_zoom_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetZoom(metadata, value, NULL, ctx->mCtrlValues);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      ctx->GetZoom(metadata, value);
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.zoom_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.zoom_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.zoom_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  case UMD_VIDEO_CTRL_PANTILT: {
+    umd_pan_tilt_t* value = (umd_pan_tilt_t*)payload;
+    switch (request) {
+    case UMD_CTRL_SET_REQUEST:
+      ctx->SetZoom(metadata, NULL, value, ctx->mCtrlValues);
+      break;
+    case UMD_CTRL_GET_REQUEST:
+      *value = umd_current_pan_and_tilt;
+      break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.pan_tilt_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.pan_tilt_max;
+      break;
+    case UMD_CTRL_DEF_REQUEST:
+      *value = ctx->mCtrlValues.pan_tilt_def;
+      break;
+    default:
+      UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
+      return false;
+    }
+    break;
+  }
+  default:
+    UMD_LOG_ERROR("Unknown control request 0x%X!\n", id);
+    return false;
   }
   if (request == UMD_CTRL_SET_REQUEST) {
     if (!ctx->SetCameraMetadata(metadata)) {
@@ -1105,15 +1327,17 @@ bool UmdCamera::GetCameraMetadataLocked(CameraMetadata &meta) {
   return true;
 }
 
-bool UmdCamera::SetCameraMetadata(CameraMetadata &meta) {
+bool UmdCamera::SetCameraMetadata(CameraMetadata &meta, bool doSubmitReq) {
   const std::lock_guard<std::mutex> lock(mCameraMutex);
-  return SetCameraMetadataLocked(meta);
+  return SetCameraMetadataLocked(meta, doSubmitReq);
 }
 
-bool UmdCamera::SetCameraMetadataLocked(CameraMetadata &meta) {
+bool UmdCamera::SetCameraMetadataLocked(CameraMetadata &meta, bool doSubmitReq) {
   mRequest.metadata.clear();
   mRequest.metadata.append(meta);
-  mMsg.push(UmdCameraMessage::CAMERA_SUBMIT_REQUEST);
+  if (doSubmitReq) {
+    mMsg.push(UmdCameraMessage::CAMERA_SUBMIT_REQUEST);
+  }
   return true;
 }
 
@@ -1135,4 +1359,96 @@ uint32_t UmdCamera::GetBlobSize(uint8_t *buffer, uint32_t size) {
   }
 
   return res;
+}
+
+void UmdCamera::SetDefaultControlValues(CameraMetadata& meta) {
+
+  {
+    uint32_t tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.iso_exp_priority", "select_priority");
+    if (tag != 0) {
+      // Here priority is CamX ISOPriority whose index is 0.
+      int32_t priority = 0;
+      meta.update(tag, &priority, 1);
+    }
+
+    tag = GetVendorTagByName(
+      "org.codeaurora.qcamera3.iso_exp_priority", "use_iso_exp_priority");
+    if (tag != 0) {
+      int64_t isomode = 0; // ISO_MODE_AUTO
+      meta.update(tag, &isomode, 1);
+    }
+  }
+
+  SetExposureCompensation(meta, mCtrlValues.brightness_def);
+  SetContrast(meta, mCtrlValues.contrast_def);
+  SetSaturation(meta, mCtrlValues.saturation_def);
+  SetSharpness(meta, mCtrlValues.sharpness_def);
+  SetAntibanding(meta, mCtrlValues.antibanding_def);
+  SetADRC(meta, mCtrlValues.backlight_comp_def);
+  SetISO(meta, mCtrlValues.gain_def);
+  SetWbTemperature(meta, mCtrlValues.wb_temp_def);
+  SetWbMode(meta, mCtrlValues.wb_mode_def);
+  SetExposureTime(meta, mCtrlValues.exp_time_def);
+  SetExposureMode(meta, mCtrlValues.exp_mode_def);
+  SetFocusMode(meta, mCtrlValues.exp_focus_mode_def);
+  SetZoom(meta, &mCtrlValues.zoom_def, &mCtrlValues.pan_tilt_def, mCtrlValues);
+}
+
+void UmdCamera::FillInitialControlValue() {
+  int32_t pan_min, pan_max, pan_def, tilt_min, tilt_max, tilt_def;
+  mCtrlValues.brightness_min = -12;
+  mCtrlValues.brightness_max = 12;
+  mCtrlValues.brightness_def = 0;
+
+  mCtrlValues.contrast_min = 1;
+  mCtrlValues.contrast_max = 10;
+  mCtrlValues.contrast_def = 5;
+
+  mCtrlValues.saturation_min = 0;
+  mCtrlValues.saturation_max = 10;
+  mCtrlValues.saturation_def = 5;
+
+  mCtrlValues.sharpness_min = 0;
+  mCtrlValues.sharpness_max = 6;
+  mCtrlValues.sharpness_def = 2;
+
+  mCtrlValues.antibanding_def = UMD_VIDEO_ANTIBANDING_AUTO;
+
+  mCtrlValues.backlight_comp_min = 0;
+  mCtrlValues.backlight_comp_max = 1;
+  mCtrlValues.backlight_comp_def = 0;
+
+  mCtrlValues.gain_min = 100;
+  mCtrlValues.gain_max = 3200;
+  mCtrlValues.gain_def = 800;
+
+  mCtrlValues.wb_temp_min = 2800;
+  mCtrlValues.wb_temp_max = 6500;
+  mCtrlValues.wb_temp_def = 4600;
+
+  mCtrlValues.wb_mode_def = UMD_VIDEO_WB_MODE_AUTO;
+
+  mCtrlValues.exp_time_min = 333;
+  mCtrlValues.exp_time_max = 100000;
+  mCtrlValues.exp_time_def = 333;
+
+  mCtrlValues.exp_mode_def = UMD_VIDEO_EXPOSURE_MODE_AUTO;
+
+  mCtrlValues.exp_focus_mode_def = UMD_VIDEO_FOCUS_MODE_AUTO;
+
+  mCtrlValues.zoom_min = 100;
+  mCtrlValues.zoom_max = 500;
+  mCtrlValues.zoom_def = 100;
+
+  pan_min = -25;
+  pan_max = 25;
+  pan_def = 0;
+  tilt_min = -25;
+  tilt_max = 25;
+  tilt_def = 0;
+
+  mCtrlValues.pan_tilt_min = UMD_VIDEO_CTRL_SET_PAN_AND_TILT(pan_min, tilt_min);
+  mCtrlValues.pan_tilt_max = UMD_VIDEO_CTRL_SET_PAN_AND_TILT(pan_max, tilt_max);
+  mCtrlValues.pan_tilt_def = UMD_VIDEO_CTRL_SET_PAN_AND_TILT(pan_def, tilt_def);
 }

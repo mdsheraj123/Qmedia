@@ -188,10 +188,12 @@ private:
   void StreamCb(StreamBuffer buffer);
 
   void onAudioBuffer(AudioBuffer * buffer) override;
+  int32_t InitializeAudio();
 
   void cameraThreadHandler();
   void videoBufferLoop();
 
+  int32_t InitializeCamera();
   bool CameraStart();
   bool CameraStop();
   bool CameraSubmitRequest();
@@ -219,6 +221,7 @@ private:
   int mCameraId;
   int mStreamId;
   bool mActive;
+  bool mOnlyUAC;
 
   sp<Camera3DeviceClient> mDeviceClient;
   IAllocDevice* mAllocDeviceInterface;

@@ -393,6 +393,8 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                             requireActivity().runOnUiThread(() -> {
                                 mHDMIinSurfaceHolder.setFixedSize(resolution[0].getWidth(), resolution[0].getHeight());
                             });
+                            mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
+                            mCameraBase.addPreviewStream(mHDMIinSurfaceHolder);
                             mMediaCodecRecorder = new MediaCodecRecorder(mContext, resolution[0].getWidth(),
                                     resolution[0].getHeight(), mSettingData.getIsHDMIinAudioEnabled(0));
                             mCameraBase.addRecorderStream(mMediaCodecRecorder.getRecorderSurface());
@@ -487,14 +489,14 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
             public void surfaceCreated(SurfaceHolder holder) {
                 Log.v(TAG, "surfaceCreated  for Camera");
                 mPrimaryDisplayButton.setEnabled(true);
-                mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
-                mCameraBase.addPreviewStream(holder);
                 if (mSettingData.getIsHDMIinCameraEnabled(0)) {
                     mHDMIinSurfaceHolder = holder;
                     CameraManager manager =
                             (CameraManager) requireContext().getSystemService(Context.CAMERA_SERVICE);
                     manager.registerAvailabilityCallback(mAvailabilityCallback, mAvailabilityCallbackHandler);
                 } else {
+                    mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
+                    mCameraBase.addPreviewStream(holder);
                     holder.setFixedSize(1920, 1080);
                 }
             }

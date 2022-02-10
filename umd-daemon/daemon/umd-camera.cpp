@@ -866,6 +866,12 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     case UMD_CTRL_DEF_REQUEST:
       *value = ctx->mCtrlValues.antibanding_def;
       break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.antibanding_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.antibanding_max;
+      break;
     default:
       UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
       return false;
@@ -1453,6 +1459,8 @@ void UmdCamera::FillInitialControlValue() {
   mCtrlValues.sharpness_def = 2;
 
   mCtrlValues.antibanding_def = UMD_VIDEO_ANTIBANDING_AUTO;
+  mCtrlValues.antibanding_min = UMD_VIDEO_ANTIBANDING_DISABLED;
+  mCtrlValues.antibanding_max = UMD_VIDEO_ANTIBANDING_AUTO;
 
   mCtrlValues.backlight_comp_min = 0;
   mCtrlValues.backlight_comp_max = 1;

@@ -98,6 +98,8 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
     mMicDev(micdev),
     mCameraId(cameraId),
     mStreamId(-1),
+    mActive(false),
+    mOnlyUAC(false),
     mRequestId(-1),
     mDeviceClient(nullptr),
     mAllocDeviceInterface(nullptr),
@@ -108,15 +110,15 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
     mCtrlValues({}) {}
 
 UmdCamera::~UmdCamera() {
-  mActive = false;
 
   mMsg.push(UmdCameraMessage::CAMERA_TERMINATE);
 
   if (mCameraThread) {
     mCameraThread->join();
   }
-
-  mAudioRecorder->Stop();
+  if (mAudioRecorder) {
+    mAudioRecorder->Stop();
+  }
 
   if (mGadget != nullptr)
     umd_gadget_free (mGadget);
@@ -129,76 +131,36 @@ UmdCamera::~UmdCamera() {
 
 int32_t UmdCamera::Initialize() {
 
-  mClientCb.errorCb = [&](
-      CameraErrorCode errorCode,
-      const CaptureResultExtras &extras) { ErrorCb(errorCode, extras); };
+  int32_t res = -1;
 
-  mClientCb.idleCb = [&]() { IdleCb(); };
-
-  mClientCb.peparedCb = [&](int id) { PreparedCb(id); };
-
-  mClientCb.shutterCb = [&](const CaptureResultExtras &extras,
-                            int64_t ts) { ShutterCb(extras, ts); };
-
-  mClientCb.resultCb = [&](const CaptureResult &result) { ResultCb(result); };
-
-  mAllocDeviceInterface = AllocDeviceFactory::CreateAllocDevice();
-  if (nullptr == mAllocDeviceInterface) {
-    UMD_LOG_ERROR ("Alloc device creation failed!\n");
+  if (mUvcDev.empty() && mUacDev.empty()) {
+    UMD_LOG_ERROR("Select atleast UVC or UAC or both!\n");
     return -ENODEV;
   }
 
-  mDeviceClient = new Camera3DeviceClient(mClientCb);
-  if (nullptr == mDeviceClient.get()) {
-    UMD_LOG_ERROR ("Invalid camera device client!\n");
-    return -ENOMEM;
+  if (!mUvcDev.empty()) {
+    res = InitializeCamera();
+    if (res != 0) {
+      printf("InitializeCamera() failed. res: %d\n", res);
+      return -ENODEV;
+    }
+  } else {
+    mOnlyUAC = true;
   }
 
-  auto ret = mDeviceClient->Initialize();
-  if (ret) {
-    UMD_LOG_ERROR ("Camera client initialization failed!\n");
-    return ret;
+  if (!mUacDev.empty()) {
+    res = InitializeAudio();
+    if (res != 0) {
+      printf("InitializeAudio() failed. res: %d\n", res);
+      return -ENODEV;
+    }
   }
 
-  ret = mDeviceClient->OpenCamera(mCameraId);
-  if (ret) {
-    UMD_LOG_ERROR ("Camera %d open failed!\n", mCameraId);
-    return ret;
-  }
-
-  ret = mDeviceClient->GetCameraInfo(mCameraId, &mStaticInfo);
-  if (ret) {
-    UMD_LOG_ERROR ("GetCameraInfo failed!\n");
-    return ret;
-  }
-
-  ret = mDeviceClient->CreateDefaultRequest(RequestTemplate::PREVIEW,
-                                            &mRequest.metadata);
-  if (ret) {
-    UMD_LOG_ERROR ("Camera CreateDefaultRequest failed!\n");
-    return ret;
-  }
-
-  FillInitialControlValue();
-
-  mGadget = umd_gadget_new (mUvcDev.c_str(), mUacDev.c_str(), &mUmdVideoCallbacks, this);
+  mGadget = umd_gadget_new(mUvcDev.empty() ? nullptr : mUvcDev.c_str(),
+    mUacDev.empty() ? nullptr : mUacDev.c_str(), &mUmdVideoCallbacks, this);
   if (nullptr == mGadget) {
     UMD_LOG_ERROR ("Failed to create UMD gadget!\n");
     return -ENODEV;
-  }
-
-  AudioRecorderConfig config;
-  config.samplerate = UAC_SAMPLE_RATE;
-  config.format = AUDIO_FORMAT_S16_LE;
-  config.period_size = AUDIO_RECORDER_PERIOD_SIZE;
-  config.period_count = AUDIO_RECORDER_PERIOD_COUNT;
-  config.channels = AUDIO_RECORDER_NUM_CHANNELS;
-  mAudioRecorder = std::unique_ptr<AudioRecorder>(
-      new AudioRecorder(mMicDev, config, this));
-
-  if (mAudioRecorder == nullptr) {
-    UMD_LOG_ERROR ("AudioRecorder creation failed!\n");
-    return -ENOMEM;
   }
 
   mCameraThread = std::unique_ptr<std::thread>(
@@ -209,9 +171,92 @@ int32_t UmdCamera::Initialize() {
     return -ENOMEM;
   }
 
+  if (!mUacDev.empty()) {
+    res = mAudioRecorder->Start();
+    if (res != 0) {
+      UMD_LOG_ERROR("Failed to start audio recorder!\n");
+      return res;
+    }
+  }
+
   return 0;
 }
 
+int32_t UmdCamera::InitializeCamera() {
+
+  mClientCb.errorCb = [&](
+    CameraErrorCode errorCode,
+    const CaptureResultExtras& extras) { ErrorCb(errorCode, extras); };
+
+  mClientCb.idleCb = [&]() { IdleCb(); };
+
+  mClientCb.peparedCb = [&](int id) { PreparedCb(id); };
+
+  mClientCb.shutterCb = [&](const CaptureResultExtras& extras,
+    int64_t ts) { ShutterCb(extras, ts); };
+
+  mClientCb.resultCb = [&](const CaptureResult& result) { ResultCb(result); };
+
+  mAllocDeviceInterface = AllocDeviceFactory::CreateAllocDevice();
+  if (nullptr == mAllocDeviceInterface) {
+    UMD_LOG_ERROR("Alloc device creation failed!\n");
+    return -ENODEV;
+  }
+
+  mDeviceClient = new Camera3DeviceClient(mClientCb);
+  if (nullptr == mDeviceClient.get()) {
+    UMD_LOG_ERROR("Invalid camera device client!\n");
+    return -ENOMEM;
+  }
+
+  auto ret = mDeviceClient->Initialize();
+  if (ret) {
+    UMD_LOG_ERROR("Camera client initialization failed!\n");
+    return ret;
+  }
+
+  ret = mDeviceClient->OpenCamera(mCameraId);
+  if (ret) {
+    UMD_LOG_ERROR("Camera %d open failed!\n", mCameraId);
+    return ret;
+  }
+
+  ret = mDeviceClient->GetCameraInfo(mCameraId, &mStaticInfo);
+  if (ret) {
+    UMD_LOG_ERROR("GetCameraInfo failed!\n");
+    return ret;
+  }
+
+  ret = mDeviceClient->CreateDefaultRequest(RequestTemplate::PREVIEW,
+    &mRequest.metadata);
+  if (ret) {
+    UMD_LOG_ERROR("Camera CreateDefaultRequest failed!\n");
+    return ret;
+  }
+
+  FillInitialControlValue();
+
+  return 0;
+}
+
+int32_t UmdCamera::InitializeAudio() {
+
+  AudioRecorderConfig config;
+  config.samplerate = UAC_SAMPLE_RATE;
+  config.format = AUDIO_FORMAT_S16_LE;
+  config.period_size = AUDIO_RECORDER_PERIOD_SIZE;
+  config.period_count = AUDIO_RECORDER_PERIOD_COUNT;
+  config.channels = AUDIO_RECORDER_NUM_CHANNELS;
+  mAudioRecorder = std::unique_ptr<AudioRecorder>(
+    new AudioRecorder(mMicDev, config, this));
+
+  if (mAudioRecorder == nullptr) {
+    UMD_LOG_ERROR("AudioRecorder creation failed!\n");
+    return -ENOMEM;
+  }
+
+  return 0;
+}
 bool UmdCamera::setupVideoStream(UmdVideoSetup * stmsetup, void * userdata) {
   UmdCamera *ctx = static_cast<UmdCamera*>(userdata);
 
@@ -821,6 +866,12 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     case UMD_CTRL_DEF_REQUEST:
       *value = ctx->mCtrlValues.antibanding_def;
       break;
+    case UMD_CTRL_MIN_REQUEST:
+      *value = ctx->mCtrlValues.antibanding_min;
+      break;
+    case UMD_CTRL_MAX_REQUEST:
+      *value = ctx->mCtrlValues.antibanding_max;
+      break;
     default:
       UMD_LOG_ERROR("Unknown control request 0x%X!\n", request);
       return false;
@@ -1117,11 +1168,11 @@ fail_return:
   mDeviceClient->ReturnStreamBuffer(buffer);
 }
 
-void UmdCamera::onAudioBuffer(AudioBuffer *buffer) {
-  if (mActive) {
-    uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_AUDIO_STREAM_ID,
-        buffer->data, buffer->size, buffer->size, buffer->timestamp);
-    umd_gadget_wait_buffer (mGadget, UMD_AUDIO_STREAM_ID, bufidx);
+void UmdCamera::onAudioBuffer(AudioBuffer* buffer) {
+  if (mActive || mOnlyUAC) {
+    uint32_t bufidx = umd_gadget_submit_buffer(mGadget, UMD_AUDIO_STREAM_ID,
+      buffer->data, buffer->size, buffer->size, buffer->timestamp);
+    umd_gadget_wait_buffer(mGadget, UMD_AUDIO_STREAM_ID, bufidx);
   }
 }
 
@@ -1133,25 +1184,27 @@ void UmdCamera::cameraThreadHandler() {
     switch(event) {
       case UmdCameraMessage::CAMERA_START:
         UMD_LOG_DEBUG ("CAMERA_START\n");
-        if (CameraStart()) {
+        if (!CameraStart()) {
           UMD_LOG_ERROR ("Camera start failed.\n");
         }
         break;
       case UmdCameraMessage::CAMERA_STOP:
         UMD_LOG_DEBUG ("CAMERA_STOP\n");
-        if (CameraStop()) {
+        if (!CameraStop()) {
           UMD_LOG_ERROR ("Camera stop failed.\n");
         }
         break;
       case UmdCameraMessage::CAMERA_SUBMIT_REQUEST:
         UMD_LOG_DEBUG ("CAMERA_SUBMIT_REQUEST\n");
-        if (CameraSubmitRequest()) {
-          UMD_LOG_ERROR ("Camera stop failed.\n");
+        if (!CameraSubmitRequest()) {
+          UMD_LOG_ERROR ("Camera submit request failed.\n");
         }
         break;
       case UmdCameraMessage::CAMERA_TERMINATE:
         UMD_LOG_DEBUG ("CAMERA_TERMINATE\n");
-        CameraStop();
+        if (!CameraStop()) {
+          UMD_LOG_ERROR("Camera stop failed.\n");
+        }
         running = false;
         break;
       default:
@@ -1250,10 +1303,6 @@ bool UmdCamera::CameraStart() {
     return false;
   }
 
-  if(mAudioRecorder->Start()) {
-    UMD_LOG_ERROR ("Failed to start audio recorder!\n");
-  }
-
   return true;
 }
 
@@ -1261,10 +1310,6 @@ bool UmdCamera::CameraStop() {
   UMD_LOG_DEBUG ("Camera stop\n");
 
   const std::lock_guard<std::mutex> lock(mCameraMutex);
-
-  if (mAudioRecorder->Stop()) {
-    UMD_LOG_ERROR ("Audio recorder failed!\n");
-  }
 
   if (mVideoBufferThread == nullptr) {
     UMD_LOG_ERROR ("Video loop thread not started!\n");
@@ -1414,6 +1459,8 @@ void UmdCamera::FillInitialControlValue() {
   mCtrlValues.sharpness_def = 2;
 
   mCtrlValues.antibanding_def = UMD_VIDEO_ANTIBANDING_AUTO;
+  mCtrlValues.antibanding_min = UMD_VIDEO_ANTIBANDING_DISABLED;
+  mCtrlValues.antibanding_max = UMD_VIDEO_ANTIBANDING_AUTO;
 
   mCtrlValues.backlight_comp_min = 0;
   mCtrlValues.backlight_comp_max = 1;

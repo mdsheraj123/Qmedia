@@ -108,6 +108,8 @@ struct UVCControlValues {
   umd_sharpness_t       sharpness_max;
   umd_sharpness_t       sharpness_def;
   umd_antibanding_t     antibanding_def;
+  umd_antibanding_t     antibanding_min;
+  umd_antibanding_t     antibanding_max;
   umd_backlight_comp_t  backlight_comp_min;
   umd_backlight_comp_t  backlight_comp_max;
   umd_backlight_comp_t  backlight_comp_def;
@@ -188,10 +190,12 @@ private:
   void StreamCb(StreamBuffer buffer);
 
   void onAudioBuffer(AudioBuffer * buffer) override;
+  int32_t InitializeAudio();
 
   void cameraThreadHandler();
   void videoBufferLoop();
 
+  int32_t InitializeCamera();
   bool CameraStart();
   bool CameraStop();
   bool CameraSubmitRequest();
@@ -219,6 +223,7 @@ private:
   int mCameraId;
   int mStreamId;
   bool mActive;
+  bool mOnlyUAC;
 
   sp<Camera3DeviceClient> mDeviceClient;
   IAllocDevice* mAllocDeviceInterface;

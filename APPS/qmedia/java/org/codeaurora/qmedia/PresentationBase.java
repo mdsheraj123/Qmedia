@@ -235,9 +235,14 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                             });
                             mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
                             mCameraBase.addPreviewStream(mHDMIinSurfaceHolder);
-                            mMediaCodecRecorder = new MediaCodecRecorder(getContext(), resolution[0].getWidth(),
-                                    resolution[0].getHeight(), mData.getIsHDMIinAudioEnabled(mPresentationIndex));
-                            mCameraBase.addRecorderStream(mMediaCodecRecorder.getRecorderSurface());
+                            if (mData.getIsHDMIinVideoEnabled(mPresentationIndex)) {
+                                mMediaCodecRecorder = new MediaCodecRecorder(getContext(),
+                                        resolution[0].getWidth(),
+                                        resolution[0].getHeight(),
+                                        mData.getIsHDMIinAudioEnabled(mPresentationIndex));
+                                mCameraBase.addRecorderStream(
+                                        mMediaCodecRecorder.getRecorderSurface());
+                            }
                             if (mData.getIsHDMIinAudioEnabled(mPresentationIndex)) {
                                 mHDMIinAudioPlayback = new HDMIinAudioPlayback(getContext());
                             }
@@ -247,8 +252,10 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                         if (mCameraRunningStateSelected && !mCameraRunning.getAndSet(true)) {
                             Log.d(TAG, "onCameraAvailable mCameraRunningStateSelected so will start");
                             mCameraBase.startCamera(mData.getCameraID(mPresentationIndex));
-                            mMediaCodecRecorder.start(0);
-                            mRecorderStarted = true;
+                            if (mMediaCodecRecorder != null) {
+                                mMediaCodecRecorder.start(0);
+                                mRecorderStarted = true;
+                            }
                             if (mHDMIinAudioPlayback != null) {
                                 mHDMIinAudioPlayback.start();
                             }
@@ -354,8 +361,10 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                     if (mHDMIinAudioPlayback != null) {
                         mHDMIinAudioPlayback.start();
                     }
-                    mMediaCodecRecorder.start(0);
-                    mRecorderStarted = true;
+                    if (mMediaCodecRecorder != null) {
+                        mMediaCodecRecorder.start(0);
+                        mRecorderStarted = true;
+                    }
                 }
             }
         }
@@ -389,8 +398,10 @@ public class PresentationBase extends Presentation implements CameraDisconnected
             if (mCameraRunning.getAndSet(false)) {
                 if (mData.getHDMISource(mPresentationIndex).equals("Camera") &&
                         mData.getIsHDMIinCameraEnabled(mPresentationIndex) && mRecorderStarted) {
-                    mMediaCodecRecorder.stop();
-                    mRecorderStarted = false;
+                    if (mMediaCodecRecorder != null) {
+                        mMediaCodecRecorder.stop();
+                        mRecorderStarted = false;
+                    }
                     if (mHDMIinAudioPlayback != null) {
                         mHDMIinAudioPlayback.stop();
                     }

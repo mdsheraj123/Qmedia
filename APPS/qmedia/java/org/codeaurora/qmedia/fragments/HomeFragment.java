@@ -328,8 +328,10 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                     if (!mCameraRunning.getAndSet(true)) {
                         mCameraBase.startCamera(mSettingData.getCameraID(0));
                         if (mSettingData.getIsHDMIinCameraEnabled(0)) {
-                            mMediaCodecRecorder.start(0);
-                            mRecorderStarted = true;
+                            if (mMediaCodecRecorder != null) {
+                                mMediaCodecRecorder.start(0);
+                                mRecorderStarted = true;
+                            }
                             if (mHDMIinAudioPlayback != null) {
                                 mHDMIinAudioPlayback.start();
                             }
@@ -395,9 +397,15 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                             });
                             mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
                             mCameraBase.addPreviewStream(mHDMIinSurfaceHolder);
-                            mMediaCodecRecorder = new MediaCodecRecorder(mContext, resolution[0].getWidth(),
-                                    resolution[0].getHeight(), mSettingData.getIsHDMIinAudioEnabled(0));
-                            mCameraBase.addRecorderStream(mMediaCodecRecorder.getRecorderSurface());
+                            if (mSettingData.getIsHDMIinVideoEnabled(0)) {
+                                // Create Encoder instance if Video is enabled
+                                mMediaCodecRecorder =
+                                        new MediaCodecRecorder(mContext, resolution[0].getWidth(),
+                                                resolution[0].getHeight(),
+                                                mSettingData.getIsHDMIinAudioEnabled(0));
+                                mCameraBase.addRecorderStream(
+                                        mMediaCodecRecorder.getRecorderSurface());
+                            }
                             if (mSettingData.getIsHDMIinAudioEnabled(0)) {
                                 mHDMIinAudioPlayback = new HDMIinAudioPlayback(requireContext());
                             }
@@ -408,8 +416,10 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                             Log.d(TAG, "onCameraAvailable " +
                                     "mCameraRunningStateSelected and !mCameraRunning so will start");
                             mCameraBase.startCamera(mSettingData.getCameraID(0));
-                            mMediaCodecRecorder.start(0);
-                            mRecorderStarted = true;
+                            if (mMediaCodecRecorder != null) {
+                                mMediaCodecRecorder.start(0);
+                                mRecorderStarted = true;
+                            }
                             if (mHDMIinAudioPlayback != null) {
                                 mHDMIinAudioPlayback.start();
                             }

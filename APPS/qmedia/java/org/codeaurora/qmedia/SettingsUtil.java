@@ -81,6 +81,7 @@ class SettingsData {
     protected String camID;
     protected Boolean isHDMIinCameraEnabled;
     protected Boolean isHDMIinAudioEnabled;
+    protected Boolean isHDMIinVideoEnabled;
 
 }
 
@@ -121,6 +122,7 @@ public class SettingsUtil {
         }
 
         hdmi_1_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_1_hdmi_in_audio_enable", false);
+        hdmi_1_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_1_hdmi_in_video_enable", false);
 
         data.add(hdmi_1_setting);
 
@@ -147,6 +149,7 @@ public class SettingsUtil {
         }
 
         hdmi_2_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_2_hdmi_in_audio_enable", false);
+        hdmi_2_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_2_hdmi_in_video_enable", false);
 
         data.add(hdmi_2_setting);
 
@@ -173,6 +176,7 @@ public class SettingsUtil {
         }
 
         hdmi_3_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_3_hdmi_in_audio_enable", false);
+        hdmi_3_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_3_hdmi_in_video_enable", false);
 
         data.add(hdmi_3_setting);
         Log.v(TAG, "SettingsUtil exit");
@@ -186,6 +190,7 @@ public class SettingsUtil {
             Log.d(TAG, "Camera ID : " + data.get(it).camID);
             Log.d(TAG, "Is HDMIin Camera Enabled : " + data.get(it).isHDMIinCameraEnabled);
             Log.d(TAG, "Is HDMIin Audio Enabled : " + data.get(it).isHDMIinAudioEnabled);
+            Log.d(TAG, "Is HDMIin Video Enabled : " + data.get(it).isHDMIinVideoEnabled);
             Log.d(TAG, "#####################################");
         }
     }
@@ -212,5 +217,9 @@ public class SettingsUtil {
 
     public Boolean getIsHDMIinAudioEnabled(int index) {
         return data.get(index).isHDMIinAudioEnabled;
+    }
+
+    public Boolean getIsHDMIinVideoEnabled(int index) {
+        return data.get(index).isHDMIinVideoEnabled;
     }
 }

@@ -119,7 +119,6 @@ public class CameraBase {
         public void onOpened(CameraDevice cameraDevice) {
             // This method is called when the camera is opened. We start camera preview here.
             Log.v(TAG, "onOpened Camera id: " + cameraDevice.getId());
-            mCameraOpenCloseLock.release();
             mCameraDevice = cameraDevice;
             createAndStartCameraSession();
         }
@@ -153,6 +152,7 @@ public class CameraBase {
                 public void onConfigured(
                         @NonNull CameraCaptureSession cameraCaptureSession) {
                     Log.v(TAG, "onConfigured");
+                    mCameraOpenCloseLock.release();
                     // The camera is already closed
                     if (null == mCameraDevice) {
                         Log.w(TAG, "mCameraDevice is null, returning from onConfigured");
@@ -175,6 +175,7 @@ public class CameraBase {
                 public void onConfigureFailed(
                         @NonNull CameraCaptureSession cameraCaptureSession) {
                     Log.e(TAG, "onConfigureFailed");
+                    mCameraOpenCloseLock.release();
                     Toast.makeText(mCameraContext.getApplicationContext(), "onConfigureFailed",
                             Toast.LENGTH_SHORT).show();
                 }

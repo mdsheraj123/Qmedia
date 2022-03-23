@@ -64,6 +64,7 @@ package org.codeaurora.qmedia.fragments;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.params.StreamConfigurationMap;
@@ -82,6 +83,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -109,6 +111,7 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
     private final ArrayList<SurfaceView> mSurfaceViewList = new ArrayList<>();
     private final ArrayList<MediaCodecDecoder> mMediaCodecDecoderList = new ArrayList<>();
     private final ArrayList<PresentationBase> mPresentationBaseList = new ArrayList<>();
+    private ImageView mImageView;
     private SettingsUtil mSettingData;
     private ArrayList<String> mFileNames;
     private Boolean mPrimaryDisplayStarted = false;
@@ -169,6 +172,9 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                                 "Invalid Decode configuration", Toast.LENGTH_SHORT).show();
                 }
             }
+        } else if (mSettingData.getHDMISource(0).equals("Camera") &&
+                mSettingData.getIsReprocEnabled(0)) { // This is to handle reproc use case
+            return inflater.inflate(R.layout.reproc_use_case, container, false);
         }
 
         // Load Default layout for all other scenario e.g. HDMI In and Concurrent HDMI
@@ -183,7 +189,11 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
             loadFileNames();
             handleDecode(view);
         } else if (mSettingData.getHDMISource(0).equals("Camera")) {
-            handleCamera(view);
+            if (mSettingData.getIsReprocEnabled(0)) {
+                handleCameraAndReproc(view);
+            } else {
+                handleCamera(view);
+            }
         } else {
             if (mSettingData.getHDMISource(1).equals("None") &&
                     mSettingData.getHDMISource(2).equals("None")) {
@@ -485,6 +495,47 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                 });
             }
             Log.v(TAG, "CameraDisconnectedThread exit");
+        }
+    }
+
+    private void handleCameraAndReproc(View view) {
+        Log.v(TAG, "handleCameraAndReproc enter");
+        mPrimaryDisplayButton = view.findViewById(R.id.reproc_button);
+        mPrimaryDisplayButton
+                .setOnClickListener((View v) -> processCameraAndSecondaryDisplaysToggle());
+        mImageView = view.findViewById(R.id.imageview0);
+        mSurfaceViewList.add(view.findViewById(R.id.surfaceView1));
+        mSurfaceViewList.add(view.findViewById(R.id.surfaceView2));
+        mSurfaceViewList.add(view.findViewById(R.id.surfaceView3));
+        for (SurfaceView surface : mSurfaceViewList) {
+            surface.getHolder().addCallback(new SurfaceHolder.Callback() {
+                @Override
+                public void surfaceCreated(SurfaceHolder holder) {
+                    holder.setFixedSize(1920,1080);
+                    holder.setFormat(ImageFormat.YUV_420_888);
+                    createReprocStream();
+                }
+
+                @Override
+                public void surfaceChanged(SurfaceHolder holder, int format, int width,
+                                           int height) { }
+
+                @Override
+                public void surfaceDestroyed(SurfaceHolder holder) { }
+            });
+        }
+        Log.v(TAG, "handleCameraAndReproc exit");
+    }
+
+    private void createReprocStream() {
+        mSurfaceCount++;
+        if (mSurfaceCount == mSurfaceViewList.size()) {
+            mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
+            mCameraBase.enableReproc(mImageView);
+            for (SurfaceView surface : mSurfaceViewList) {
+                mCameraBase.addReprocStream(surface);
+            }
+            mPrimaryDisplayButton.setEnabled(true);
         }
     }
 

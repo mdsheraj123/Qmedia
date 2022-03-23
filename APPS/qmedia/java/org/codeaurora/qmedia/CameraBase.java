@@ -63,31 +63,44 @@
 package org.codeaurora.qmedia;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
+import android.hardware.camera2.params.InputConfiguration;
 import android.hardware.camera2.params.OutputConfiguration;
 import android.hardware.camera2.params.SessionConfiguration;
+import android.media.Image;
+import android.media.ImageReader;
+import android.media.ImageWriter;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
+import android.util.Range;
+import android.view.PixelCopy;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CameraBase {
 
@@ -96,6 +109,19 @@ public class CameraBase {
             new CaptureRequest.Key<>(
                     "org.codeaurora.qcamera3.sessionParameters.overrideResourceCostValidation",
                     byte.class);
+    private static final CaptureRequest.Key<int[]> CHI_RECTANGLE_KEY =
+            new CaptureRequest.Key<int[]>(
+                    "com.qti.camera.multiROIinfo.streamROIInfo",
+                    int[].class);
+    private static final CaptureRequest.Key<Byte> MULTI_ROI_ENABLE_KEY =
+            new CaptureRequest.Key<>(
+                    "org.codeaurora.qcamera3.sessionParameters.MultiRoIEnable",
+                    byte.class);
+    private static final CaptureRequest.Key<Integer> STREAM_ROI_COUNT_KEY =
+            new CaptureRequest.Key<Integer>(
+                    "com.qti.camera.multiROIinfo.streamROICount",
+                    Integer.class);
+    private static final int CHANGE_ROI_DATA_NTH_FRAME = 300;
     private final Context mCameraContext;
     private final Semaphore mCameraOpenCloseLock = new Semaphore(1);
     private HandlerThread mBackgroundThread;
@@ -103,16 +129,80 @@ public class CameraBase {
     private CameraDevice mCameraDevice;
     private CameraCaptureSession mCaptureSession;
     private CaptureRequest.Builder mPreviewRequestBuilder;
-    private SurfaceHolder mStreamSurfaceHolder;
+    private SurfaceHolder mStreamSurfaceHolder = null;
     private Surface mRecordSurface;
     private Boolean mRecord = false;
     private final CameraDisconnectedListener mCameraDisconnectedListener;
+    private Boolean mEnableReproc = false;
+    private final ArrayList<SurfaceView> mSurfaceViewList = new ArrayList<>();
+    private ImageReader mYUVImageReader = null;
+    private HandlerThread mImageListenerThread = null;
+    private Handler mImageListenerHandler;
+    private ImageWriter mImageWriter = null;
+    private final AtomicBoolean mCameraIsRunning = new AtomicBoolean(false);
+    private final ArrayBlockingQueue<Image> mYuvImageQueue = new ArrayBlockingQueue<Image>(8);
+    private TotalCaptureResult mLastTotalCaptureResult;
+    private Thread mCameraReprocThread;
+    private ImageView mImageView;
+    private Bitmap mImageViewBitmap = null;
+    private int[] mROIDataSetOne = {0, 0, 1920, 1080, 1920, 0, 1920, 1080, 0, 1080, 1920, 1080};
+    private int[] mROIDataSetTwo = {1920, 0, 1920, 1080, 0, 1080, 1920, 1080, 0, 0, 1920, 1080};
+    private int mFrameNumber = 0;
+    private int mFrameCount = 0;
+    private long mInitialTime;
+    private Range<Integer> mFPSRange = new Range(30, 30);
 
     public CameraBase(Context context, CameraDisconnectedListener cameraDisconnectedListener) {
         mCameraContext = context;
         mCameraDisconnectedListener = cameraDisconnectedListener;
     }
 
+    // Reprocessing capture completed.
+    private CameraCaptureSession.CaptureCallback mReprocessingCaptureCallback =
+            new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request,
+                                               TotalCaptureResult result) {
+                }
+            };
+
+    private CameraCaptureSession.CaptureCallback mCaptureCallback =
+            new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                               @NonNull CaptureRequest request,
+                                               @NonNull TotalCaptureResult result) {
+                    mLastTotalCaptureResult = result;
+                }
+            };
+
+
+    private final ImageReader.OnImageAvailableListener mYUVImageReaderListener =
+            reader -> {
+                try {
+                    Image img = reader.acquireNextImage();
+                    if (img == null) {
+                        Log.e(TAG, "Null image returned YUV");
+                        return;
+                    }
+                    mYuvImageQueue.add(img);
+                    mFrameCount++;
+                    // Print after every 3 second for 30 fps use case.
+                    if (mFrameCount % 90 == 0) {
+                        long currentTime = SystemClock.elapsedRealtimeNanos();
+                        float fps = (float) (mFrameCount * 1e9 / (currentTime - mInitialTime));
+                        Log.i(TAG,
+                                "Stream Width: " + img.getWidth() + " Stream Height: " +
+                                        img.getHeight() +
+                                        " Camera FPS: " + String.format("%.02f", fps));
+                        mFrameCount = 0;
+                        mInitialTime = SystemClock.elapsedRealtimeNanos();
+                    }
+                } catch (IllegalStateException e) {
+                    e.printStackTrace();
+                }
+
+            };
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
         @Override
@@ -162,10 +252,25 @@ public class CameraBase {
                     try {
                         // Set Default Params
                         setDefaultCameraParam();
+                        if (mEnableReproc) {
+                            if (mCaptureSession.isReprocessable()) {
+                                if (mImageWriter != null) {
+                                    mImageWriter.close();
+                                    mImageWriter = null;
+                                }
+                                mImageWriter = ImageWriter
+                                        .newInstance(mCaptureSession.getInputSurface(), 4);
+                                mImageWriter.setOnImageReleasedListener(
+                                        writer -> Log.v(TAG, "ImageWriter.OnImageReleasedListener onImageReleased()"),
+                                        null);
+                                Log.v(TAG, "Created ImageWriter.");
+                            }
+                        }
+
                         // Finally, we start displaying the camera preview.
                         CaptureRequest mPreviewRequest = mPreviewRequestBuilder.build();
                         mCaptureSession.setRepeatingRequest(mPreviewRequest,
-                                null, mBackgroundHandler);
+                                mCaptureCallback, mBackgroundHandler);
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
@@ -186,6 +291,11 @@ public class CameraBase {
         mBackgroundThread = new HandlerThread("Camera2BackgroundThread");
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+        if (mEnableReproc) {
+            mImageListenerThread = new HandlerThread("ImageThread");
+            mImageListenerThread.start();
+            mImageListenerHandler = new Handler(mImageListenerThread.getLooper());
+        }
         Log.v(TAG, "startBackgroundThread exit");
     }
 
@@ -199,6 +309,20 @@ public class CameraBase {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        if (mEnableReproc) {
+            mImageListenerThread.quitSafely();
+            try {
+                mImageListenerThread.join();
+                mImageListenerThread = null;
+                mImageListenerHandler = null;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            if (mYUVImageReader != null) {
+                mYUVImageReader.close();
+                mYUVImageReader = null;
+            }
+        }
         Log.v(TAG, "stopBackgroundThread exit");
     }
 
@@ -206,6 +330,7 @@ public class CameraBase {
     public void startCamera(String id) {
         Log.v(TAG, "startCamera enter");
         Log.v(TAG, "Opening Camera ID" + id);
+        mInitialTime = SystemClock.elapsedRealtimeNanos();
         CameraManager manager =
                 (CameraManager) mCameraContext.getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -213,6 +338,12 @@ public class CameraBase {
             startBackgroundThread();
             manager.openCamera(id, mStateCallback, mBackgroundHandler);
             mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS);
+            if (mEnableReproc) {
+                mImageViewBitmap = Bitmap.createBitmap(3840, 2160, Bitmap.Config.ARGB_8888);
+                mCameraReprocThread = new CameraReprocThread();
+                mCameraIsRunning.set(true);
+                mCameraReprocThread.start();
+            }
         } catch (CameraAccessException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -225,10 +356,21 @@ public class CameraBase {
 
     public void stopCamera() {
         Log.v(TAG, "stopCamera enter");
+        mFrameCount = 0;
+        mFrameNumber = 0;
         if (mCameraDevice != null) {
             Log.v(TAG, "Closing Camera ID # " + mCameraDevice.getId());
         }
-
+        if (mEnableReproc) {
+            mCameraIsRunning.set(false);
+            try {
+                mCameraReprocThread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            mCameraReprocThread = null;
+            mImageViewBitmap = null;
+        }
         // Clear the surface
         if (mStreamSurfaceHolder != null) {
             mStreamSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
@@ -259,23 +401,59 @@ public class CameraBase {
         mStreamSurfaceHolder = surface;
     }
 
+    public void enableReproc(ImageView view) {
+        mEnableReproc = true;
+        mImageView = view;
+        if (mYUVImageReader == null) {
+            mYUVImageReader = ImageReader.newInstance(3840, 2160,
+                    ImageFormat.YUV_420_888, 8);
+            mYUVImageReader
+                    .setOnImageAvailableListener(mYUVImageReaderListener, mImageListenerHandler);
+        }
+    }
+
+    public void addReprocStream(SurfaceView surface) {
+        mSurfaceViewList.add(surface);
+    }
+
     private void createAndStartCameraSession() {
         Log.v(TAG, "createAndStartCameraSession enter");
         try {
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, mFPSRange);
             try {
                 mPreviewRequestBuilder.set(BYPASS_RESOURCE_CHECK_KEY, (byte) 0x01);
             } catch (IllegalArgumentException e) {
                 Log.w(TAG, "Resource ByPass Key does not exist");
             }
             List<Surface> outputs = new ArrayList<>();
-            mPreviewRequestBuilder.addTarget(mStreamSurfaceHolder.getSurface());
-            outputs.add(mStreamSurfaceHolder.getSurface());
-
+            if (mStreamSurfaceHolder != null) {
+                mPreviewRequestBuilder.addTarget(mStreamSurfaceHolder.getSurface());
+                outputs.add(mStreamSurfaceHolder.getSurface());
+            }
+            if (mEnableReproc) {
+                if (mYUVImageReader == null) {
+                    mYUVImageReader = ImageReader.newInstance(3840, 2160, ImageFormat.YUV_420_888, 8);
+                    mYUVImageReader
+                            .setOnImageAvailableListener(mYUVImageReaderListener, mImageListenerHandler);
+                }
+                mPreviewRequestBuilder.addTarget(mYUVImageReader.getSurface());
+                outputs.add(mYUVImageReader.getSurface());
+                try {
+                    mPreviewRequestBuilder.set(MULTI_ROI_ENABLE_KEY, (byte) 0x01);
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Multi ROI Enable Key does not exist");
+                }
+            }
             if (mRecord && mRecordSurface != null) {
                 mPreviewRequestBuilder.addTarget(mRecordSurface);
                 outputs.add(mRecordSurface);
+            }
+            if (!mSurfaceViewList.isEmpty()) {
+                for (SurfaceView view : mSurfaceViewList) {
+                    outputs.add(view.getHolder().getSurface());
+                }
             }
             List<OutputConfiguration> outConfigurations = new ArrayList<>(outputs.size());
             for (Surface obj : outputs) {
@@ -287,8 +465,13 @@ public class CameraBase {
                     outConfigurations,
                     new HandlerExecutor(mBackgroundHandler),
                     mCaptureStateCallBack);
-            // Here, we create a CameraCaptureSession for camera preview.
+
             sessionCfg.setSessionParameters(mPreviewRequestBuilder.build());
+            if (mEnableReproc) {
+                InputConfiguration inputConfig = new InputConfiguration(3840,2160,
+                        ImageFormat.YUV_420_888);
+                sessionCfg.setInputConfiguration(inputConfig);
+            }
             mCameraDevice.createCaptureSession(sessionCfg);
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -305,8 +488,6 @@ public class CameraBase {
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 0);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
                 CaptureRequest.CONTROL_AE_MODE_ON);
-        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
-                CaptureRequest.CONTROL_AE_MODE_ON);
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_LOCK, false);
         mPreviewRequestBuilder
                 .set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
@@ -317,6 +498,60 @@ public class CameraBase {
     public void addRecorderStream(Surface recorderSurface) {
         mRecordSurface = recorderSurface;
         mRecord = true;
+    }
+
+    class CameraReprocThread extends Thread {
+        @Override
+        public void run() {
+            while (true) {
+                Image image = mYUVImageReader.acquireNextImage();
+                if (image == null) {
+                    break;
+                }
+                image.close();
+            }
+            mYuvImageQueue.clear();
+            while (mCameraIsRunning.get()) {
+                if (!mYuvImageQueue.isEmpty()) {
+                    PixelCopy.request(mYUVImageReader.getSurface(), mImageViewBitmap, i -> {
+                        mImageView.setImageBitmap(mImageViewBitmap);
+                    }, new Handler(Looper.getMainLooper()));
+                    Image img = mYuvImageQueue.remove();
+                    mImageWriter.queueInputImage(img);
+                    try {
+                        CaptureRequest.Builder builder =
+                                mCameraDevice
+                                        .createReprocessCaptureRequest(mLastTotalCaptureResult);
+                        try {
+                            mFrameNumber++;
+                            if (mFrameNumber <= CHANGE_ROI_DATA_NTH_FRAME) {
+                                builder.set(CHI_RECTANGLE_KEY, mROIDataSetOne);
+                            } else if (mFrameNumber <= 2 * CHANGE_ROI_DATA_NTH_FRAME) {
+                                builder.set(CHI_RECTANGLE_KEY, mROIDataSetTwo);
+                            } else {
+                                mFrameNumber = 0;
+                                builder.set(CHI_RECTANGLE_KEY, mROIDataSetOne);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        try {
+                            builder.set(STREAM_ROI_COUNT_KEY, 3);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        for (SurfaceView obj : mSurfaceViewList) {
+                            builder.addTarget(obj.getHolder().getSurface());
+                        }
+                        mCaptureSession.capture(builder.build(), mReprocessingCaptureCallback,
+                                mBackgroundHandler);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    img.close();
+                }
+            }
+        }
     }
 }
 

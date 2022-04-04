@@ -1279,7 +1279,8 @@ bool UmdCamera::CameraStart() {
 
   mStreamParams.width = mVsetup.width;
   mStreamParams.height = mVsetup.height;
-  mStreamParams.allocFlags.flags = IMemAllocUsage::kSwReadOften;
+  mStreamParams.allocFlags.flags = IMemAllocUsage::kSwReadOften |
+                                   IMemAllocUsage::kHwCameraWrite;
   mStreamParams.cb = [&](StreamBuffer buffer) { StreamCb(buffer); };
 
   mStreamId = mDeviceClient->CreateStream(mStreamParams);

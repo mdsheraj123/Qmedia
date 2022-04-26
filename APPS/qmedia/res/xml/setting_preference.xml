@@ -102,6 +102,16 @@
             android:key="hdmi_1_hdmi_in_audio_enable"
             android:title="HDMIin audio enable" />
 
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_1_hdmi_in_video_enable"
+            android:title="HDMIin video enable" />
+
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_1_reproc_enable"
+            android:title="Reproc enable" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="HDMI Out 2">
@@ -143,6 +153,16 @@
             android:key="hdmi_2_hdmi_in_audio_enable"
             android:title="HDMIin audio enable" />
 
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_2_hdmi_in_video_enable"
+            android:title="HDMIin video enable" />
+
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_2_reproc_enable"
+            android:title="Reproc enable" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="HDMI Out 3">
@@ -183,6 +203,16 @@
             android:defaultValue="false"
             android:key="hdmi_3_hdmi_in_audio_enable"
             android:title="HDMIin audio enable" />
+
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_3_hdmi_in_video_enable"
+            android:title="HDMIin video enable" />
+
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_3_reproc_enable"
+            android:title="Reproc enable" />
 
     </PreferenceCategory>
 

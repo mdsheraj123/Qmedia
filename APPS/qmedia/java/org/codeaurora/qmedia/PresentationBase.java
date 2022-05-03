@@ -66,6 +66,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Presentation;
 import android.content.Context;
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.params.StreamConfigurationMap;
@@ -80,6 +81,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -97,6 +99,8 @@ public class PresentationBase extends Presentation implements CameraDisconnected
     private static final String FILES_PATH = "/storage/emulated/0/DCIM/Test";
     private final ArrayList<MediaCodecDecoder> mMediaCodecDecoderList = new ArrayList<>();
     private final ArrayList<SurfaceView> mSurfaceViewList = new ArrayList<>();
+    private ImageView mImageView;
+    private Button mReprocButton;
     private CameraBase mCameraBase = null;
     private final SettingsUtil mData;
     private final int mPresentationIndex;
@@ -161,36 +165,70 @@ public class PresentationBase extends Presentation implements CameraDisconnected
             Button mSecondaryDisplayBtn = findViewById(R.id.button_decode);
             mSecondaryDisplayBtn.setVisibility(View.INVISIBLE);
             loadFileNames();
-        } else {
+        } else if (mData.getHDMISource(mPresentationIndex).equals("Camera") &&
+                mData.getIsReprocEnabled(mPresentationIndex)) {
+            // This is to handle reproc use case
+            setContentView(R.layout.reproc_use_case);
+            mReprocButton = findViewById(R.id.reproc_button);
+            mReprocButton.setVisibility(View.INVISIBLE);
+        }
+        else {
             // Load Default layout for Camera
             setContentView(R.layout.secondary_display);
         }
         if (mData.getHDMISource(mPresentationIndex).equals("Camera")) {
-            SurfaceView mSurfaceView = findViewById(R.id.secondary_surface_view);
-            mSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
-                public void surfaceCreated(SurfaceHolder holder) {
-                    Log.d(TAG, "surfaceCreated  for Camera");
-                    if (mData.getIsHDMIinCameraEnabled(mPresentationIndex)) {
-                        mHDMIinSurfaceHolder = holder;
-                        CameraManager manager =
-                                (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
-                        manager.registerAvailabilityCallback(mAvailabilityCallback, mAvailabilityCallbackHandler);
-                    } else {
-                        mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
-                        mCameraBase.addPreviewStream(holder);
-                        holder.setFixedSize(1920, 1080);
+            if (mData.getIsReprocEnabled(mPresentationIndex)) {
+                mImageView = findViewById(R.id.imageview0);
+                mSurfaceViewList.add(findViewById(R.id.surfaceView1));
+                mSurfaceViewList.add(findViewById(R.id.surfaceView2));
+                mSurfaceViewList.add(findViewById(R.id.surfaceView3));
+                for (SurfaceView surface : mSurfaceViewList) {
+                    surface.getHolder().addCallback(new SurfaceHolder.Callback() {
+                        @Override
+                        public void surfaceCreated(SurfaceHolder holder) {
+                            holder.setFixedSize(1920,1080);
+                            holder.setFormat(ImageFormat.YUV_420_888);
+                            createReprocStream();
+                        }
+
+                        @Override
+                        public void surfaceChanged(SurfaceHolder holder, int format, int width,
+                                                   int height) { }
+
+                        @Override
+                        public void surfaceDestroyed(SurfaceHolder holder) { }
+                    });
+                }
+            } else {
+                SurfaceView mSurfaceView = findViewById(R.id.secondary_surface_view);
+                mSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+                    public void surfaceCreated(SurfaceHolder holder) {
+                        Log.d(TAG, "surfaceCreated  for Camera");
+                        if (mData.getIsHDMIinCameraEnabled(mPresentationIndex)) {
+                            mHDMIinSurfaceHolder = holder;
+                            CameraManager manager =
+                                    (CameraManager) getContext()
+                                            .getSystemService(Context.CAMERA_SERVICE);
+                            manager.registerAvailabilityCallback(mAvailabilityCallback,
+                                    mAvailabilityCallbackHandler);
+                        } else {
+                            mCameraBase =
+                                    new CameraBase(getContext(), mCameraDisconnectedListenerObject);
+                            mCameraBase.addPreviewStream(holder);
+                            holder.setFixedSize(1920, 1080);
+                        }
                     }
-                }
 
-                @Override
-                public void surfaceChanged(SurfaceHolder holder, int format, int width,
-                                           int height) {
-                }
+                    @Override
+                    public void surfaceChanged(SurfaceHolder holder, int format, int width,
+                                               int height) {
+                    }
 
-                @Override
-                public void surfaceDestroyed(SurfaceHolder holder) {
-                }
-            });
+                    @Override
+                    public void surfaceDestroyed(SurfaceHolder holder) {
+                    }
+                });
+            }
         } else if (mData.getHDMISource(mPresentationIndex).equals("MP4")) {
             if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode")) {
                 Log.d(TAG, "OpenGLES with Encode is selected");
@@ -412,6 +450,17 @@ public class PresentationBase extends Presentation implements CameraDisconnected
             }
         }
         Log.v(TAG, "Stopping secondary display Exit");
+    }
+
+    private void createReprocStream() {
+        mSurfaceCount++;
+        if (mSurfaceCount == mSurfaceViewList.size()) {
+            mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
+            mCameraBase.enableReproc(mImageView);
+            for (SurfaceView surface : mSurfaceViewList) {
+                mCameraBase.addReprocStream(surface);
+            }
+        }
     }
 
     private void createMediaCodecDecoderInstances() {

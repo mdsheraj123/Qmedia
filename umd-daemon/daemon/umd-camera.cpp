@@ -273,8 +273,8 @@ bool UmdCamera::enableVideoStream(void * userdata) {
   UMD_LOG_DEBUG ("Stream ON\n");
   UmdCamera *ctx = static_cast<UmdCamera*>(userdata);
 
-  ctx->mMsg.push(UmdCameraMessage::CAMERA_START);
   ctx->mActive = true;
+  ctx->mMsg.push(UmdCameraMessage::CAMERA_START);
   return true;
 }
 

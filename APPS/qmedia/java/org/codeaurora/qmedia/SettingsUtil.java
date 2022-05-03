@@ -82,7 +82,7 @@ class SettingsData {
     protected Boolean isHDMIinCameraEnabled;
     protected Boolean isHDMIinAudioEnabled;
     protected Boolean isHDMIinVideoEnabled;
-
+    protected Boolean isReprocEnabled;
 }
 
 public class SettingsUtil {
@@ -119,11 +119,12 @@ public class SettingsUtil {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            hdmi_1_setting.isHDMIinCameraEnabled = false;
         }
 
         hdmi_1_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_1_hdmi_in_audio_enable", false);
         hdmi_1_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_1_hdmi_in_video_enable", false);
-
+        hdmi_1_setting.isReprocEnabled = pref.getBoolean("hdmi_1_reproc_enable", false);
         data.add(hdmi_1_setting);
 
         SettingsData hdmi_2_setting = new SettingsData();
@@ -146,10 +147,12 @@ public class SettingsUtil {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            hdmi_2_setting.isHDMIinCameraEnabled = false;
         }
 
         hdmi_2_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_2_hdmi_in_audio_enable", false);
         hdmi_2_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_2_hdmi_in_video_enable", false);
+        hdmi_2_setting.isReprocEnabled = pref.getBoolean("hdmi_2_reproc_enable", false);
 
         data.add(hdmi_2_setting);
 
@@ -173,10 +176,12 @@ public class SettingsUtil {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            hdmi_3_setting.isHDMIinCameraEnabled = false;
         }
 
         hdmi_3_setting.isHDMIinAudioEnabled = pref.getBoolean("hdmi_3_hdmi_in_audio_enable", false);
         hdmi_3_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_3_hdmi_in_video_enable", false);
+        hdmi_3_setting.isReprocEnabled = pref.getBoolean("hdmi_3_reproc_enable", false);
 
         data.add(hdmi_3_setting);
         Log.v(TAG, "SettingsUtil exit");
@@ -191,6 +196,7 @@ public class SettingsUtil {
             Log.d(TAG, "Is HDMIin Camera Enabled : " + data.get(it).isHDMIinCameraEnabled);
             Log.d(TAG, "Is HDMIin Audio Enabled : " + data.get(it).isHDMIinAudioEnabled);
             Log.d(TAG, "Is HDMIin Video Enabled : " + data.get(it).isHDMIinVideoEnabled);
+            Log.d(TAG, "Is Reproc Enabled : " + data.get(it).isReprocEnabled);
             Log.d(TAG, "#####################################");
         }
     }
@@ -221,5 +227,9 @@ public class SettingsUtil {
 
     public Boolean getIsHDMIinVideoEnabled(int index) {
         return data.get(index).isHDMIinVideoEnabled;
+    }
+
+    public Boolean getIsReprocEnabled(int index) {
+        return data.get(index).isReprocEnabled;
     }
 }

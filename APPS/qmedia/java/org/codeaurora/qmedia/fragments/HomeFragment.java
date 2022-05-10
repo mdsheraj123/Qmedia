@@ -558,7 +558,11 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                 } else {
                     mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
                     mCameraBase.addPreviewStream(holder);
-                    holder.setFixedSize(1920, 1080);
+
+                    int width = mSettingData.getCameraWidth(0);
+                    int height = mSettingData.getCameraHeight(0);
+
+                    holder.setFixedSize(width, height);
                 }
             }
 

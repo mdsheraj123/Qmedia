@@ -215,7 +215,11 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                             mCameraBase =
                                     new CameraBase(getContext(), mCameraDisconnectedListenerObject);
                             mCameraBase.addPreviewStream(holder);
-                            holder.setFixedSize(1920, 1080);
+
+                            int width = mData.getCameraWidth(mPresentationIndex);
+                            int height = mData.getCameraHeight(mPresentationIndex);
+
+                            holder.setFixedSize(width, height);
                         }
                     }
 

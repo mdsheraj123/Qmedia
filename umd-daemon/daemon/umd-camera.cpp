@@ -341,7 +341,7 @@ void UmdCamera::SetContrast(CameraMetadata & meta, uint16_t value) {
   uint32_t tag = GetVendorTagByName(
       "org.codeaurora.qcamera3.contrast", "level");
   if (tag != 0) {
-    int32_t contrast = static_cast<int32_t>(value * 2 - 100);
+    int32_t contrast = static_cast<int32_t>(value);
     meta.update(tag, &contrast, 1);
   }
 }
@@ -351,7 +351,6 @@ void UmdCamera::GetContrast(CameraMetadata & meta, uint16_t * value) {
       "org.codeaurora.qcamera3.contrast", "level");
   if (tag != 0 && meta.exists(tag)) {
     int32_t contrast = meta.find(tag).data.i32[0];
-    contrast = (contrast + 200) / 2;
     *value = static_cast<uint16_t>(contrast);
   }
 }

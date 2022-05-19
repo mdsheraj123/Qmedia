@@ -79,6 +79,8 @@ class SettingsData {
     protected int decodeInstance;
     protected String composeType;
     protected String camID;
+    protected int camWidth;
+    protected int camHeight;
     protected Boolean isHDMIinCameraEnabled;
     protected Boolean isHDMIinAudioEnabled;
     protected Boolean isHDMIinVideoEnabled;
@@ -105,6 +107,11 @@ public class SettingsUtil {
                 Integer.parseInt(pref.getString("hdmi_1_decoder_instance", "1"));
         hdmi_1_setting.composeType = pref.getString("hdmi_1_compose_view", "SF");
         hdmi_1_setting.camID = pref.getString("hdmi_1_camera_id", "0");
+
+        String[] resolutions = pref.getString("hdmi_1_camera_size", "1920x1080").split("x", 2);
+
+        hdmi_1_setting.camWidth = Integer.parseInt(resolutions[0]);
+        hdmi_1_setting.camHeight = Integer.parseInt(resolutions[1]);
 
         hdmi_1_setting.isHDMIinCameraEnabled = true;
         try {
@@ -134,6 +141,11 @@ public class SettingsUtil {
         hdmi_2_setting.composeType = pref.getString("hdmi_2_compose_view", "SF");
         hdmi_2_setting.camID = pref.getString("hdmi_2_camera_id", "0");
 
+        resolutions = pref.getString("hdmi_2_camera_size", "1920x1080").split("x", 2);
+
+        hdmi_2_setting.camWidth = Integer.parseInt(resolutions[0]);
+        hdmi_2_setting.camHeight = Integer.parseInt(resolutions[1]);
+
         hdmi_2_setting.isHDMIinCameraEnabled = true;
         try {
             for (String camID : manager.getCameraIdList()) {
@@ -162,6 +174,11 @@ public class SettingsUtil {
                 Integer.parseInt(pref.getString("hdmi_3_decoder_instance", "1"));
         hdmi_3_setting.composeType = pref.getString("hdmi_3_compose_view", "SF");
         hdmi_3_setting.camID = pref.getString("hdmi_3_camera_id", "0");
+
+        resolutions = pref.getString("hdmi_3_camera_size", "1920x1080").split("x", 2);
+
+        hdmi_3_setting.camWidth = Integer.parseInt(resolutions[0]);
+        hdmi_3_setting.camHeight = Integer.parseInt(resolutions[1]);
 
         hdmi_3_setting.isHDMIinCameraEnabled = true;
         try {
@@ -193,6 +210,8 @@ public class SettingsUtil {
             Log.d(TAG, "Decoder Instance : " + data.get(it).decodeInstance);
             Log.d(TAG, "Compose Type : " + data.get(it).composeType);
             Log.d(TAG, "Camera ID : " + data.get(it).camID);
+            Log.d(TAG, "Camera width : " + data.get(it).camWidth);
+            Log.d(TAG, "Camera height : " + data.get(it).camHeight);
             Log.d(TAG, "Is HDMIin Camera Enabled : " + data.get(it).isHDMIinCameraEnabled);
             Log.d(TAG, "Is HDMIin Audio Enabled : " + data.get(it).isHDMIinAudioEnabled);
             Log.d(TAG, "Is HDMIin Video Enabled : " + data.get(it).isHDMIinVideoEnabled);
@@ -215,6 +234,14 @@ public class SettingsUtil {
 
     public String getCameraID(int index) {
         return data.get(index).camID;
+    }
+
+    public int getCameraWidth(int index) {
+        return data.get(index).camWidth;
+    }
+
+    public int getCameraHeight(int index) {
+        return data.get(index).camHeight;
     }
 
     public Boolean getIsHDMIinCameraEnabled(int index) {

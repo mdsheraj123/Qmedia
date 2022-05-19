@@ -97,6 +97,13 @@
             android:summary="%s"
             android:title="Camera ID" />
 
+        <androidx.preference.ListPreference
+            android:defaultValue="1920x1080"
+            android:entries="@array/camera_resolutions"
+            android:entryValues="@array/camera_resolutions"
+            android:key="hdmi_1_camera_size"
+            android:title="Camera resolution"/>
+
         <androidx.preference.SwitchPreference
             android:defaultValue="false"
             android:key="hdmi_1_hdmi_in_audio_enable"
@@ -148,6 +155,13 @@
             android:summary="%s"
             android:title="Camera ID" />
 
+        <androidx.preference.ListPreference
+            android:defaultValue="1920x1080"
+            android:entries="@array/camera_resolutions"
+            android:entryValues="@array/camera_resolutions"
+            android:key="hdmi_2_camera_size"
+            android:title="Camera resolution"/>
+
         <androidx.preference.SwitchPreference
             android:defaultValue="false"
             android:key="hdmi_2_hdmi_in_audio_enable"
@@ -198,6 +212,13 @@
             android:key="hdmi_3_camera_id"
             android:summary="%s"
             android:title="Camera ID" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="1920x1080"
+            android:entries="@array/camera_resolutions"
+            android:entryValues="@array/camera_resolutions"
+            android:key="hdmi_3_camera_size"
+            android:title="Camera resolution"/>
 
         <androidx.preference.SwitchPreference
             android:defaultValue="false"

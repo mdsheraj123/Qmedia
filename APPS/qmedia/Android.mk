@@ -6,7 +6,22 @@ res_dir := res $(LOCAL_PATH)/res
 
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_SRC_FILES := $(call all-java-files-under, java)
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/CameraBase.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/CameraDisconnectedListener.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/HDMIinAudioPlayback.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/MainActivity.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/MediaCodecDecoder.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/MediaCodecRecorder.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/PresentationBase.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/SettingsUtil.java
+
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/fragments/HomeFragment.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/fragments/PermissionFragment.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/fragments/SettingsFragment.java
+
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/opengles/InputComposerSurface.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/opengles/OutputComposerSurface.java
+LOCAL_SRC_FILES += java/org/codeaurora/qmedia/opengles/VideoComposer.java
 
 LOCAL_RESOURCE_DIR := $(addprefix $(LOCAL_PATH)/, $(res_dir))
 LOCAL_USE_AAPT2 := true

@@ -81,6 +81,7 @@ class SettingsData {
     protected String camID;
     protected int camWidth;
     protected int camHeight;
+    protected String snpeRuntime;
     protected Boolean isHDMIinCameraEnabled;
     protected Boolean isHDMIinAudioEnabled;
     protected Boolean isHDMIinVideoEnabled;
@@ -107,8 +108,14 @@ public class SettingsUtil {
                 Integer.parseInt(pref.getString("hdmi_1_decoder_instance", "1"));
         hdmi_1_setting.composeType = pref.getString("hdmi_1_compose_view", "SF");
         hdmi_1_setting.camID = pref.getString("hdmi_1_camera_id", "0");
+        hdmi_1_setting.snpeRuntime = pref.getString("hdmi_1_snpe_runtime", "DSP");
 
-        String[] resolutions = pref.getString("hdmi_1_camera_size", "1920x1080").split("x", 2);
+        String[] resolutions;
+        if (hdmi_1_setting.src.equals("SNPE")) {
+            resolutions = pref.getString("hdmi_1_camera_size", "1280x720").split("x", 2);
+        } else {
+            resolutions = pref.getString("hdmi_1_camera_size", "1920x1080").split("x", 2);
+        }
 
         hdmi_1_setting.camWidth = Integer.parseInt(resolutions[0]);
         hdmi_1_setting.camHeight = Integer.parseInt(resolutions[1]);
@@ -140,8 +147,13 @@ public class SettingsUtil {
                 Integer.parseInt(pref.getString("hdmi_2_decoder_instance", "1"));
         hdmi_2_setting.composeType = pref.getString("hdmi_2_compose_view", "SF");
         hdmi_2_setting.camID = pref.getString("hdmi_2_camera_id", "0");
+        hdmi_2_setting.snpeRuntime = pref.getString("hdmi_2_snpe_runtime", "DSP");
 
-        resolutions = pref.getString("hdmi_2_camera_size", "1920x1080").split("x", 2);
+        if (hdmi_2_setting.src.equals("SNPE")) {
+            resolutions = pref.getString("hdmi_2_camera_size", "1280x720").split("x", 2);
+        } else {
+            resolutions = pref.getString("hdmi_2_camera_size", "1920x1080").split("x", 2);
+        }
 
         hdmi_2_setting.camWidth = Integer.parseInt(resolutions[0]);
         hdmi_2_setting.camHeight = Integer.parseInt(resolutions[1]);
@@ -174,8 +186,13 @@ public class SettingsUtil {
                 Integer.parseInt(pref.getString("hdmi_3_decoder_instance", "1"));
         hdmi_3_setting.composeType = pref.getString("hdmi_3_compose_view", "SF");
         hdmi_3_setting.camID = pref.getString("hdmi_3_camera_id", "0");
+        hdmi_3_setting.snpeRuntime = pref.getString("hdmi_3_snpe_runtime", "DSP");
 
-        resolutions = pref.getString("hdmi_3_camera_size", "1920x1080").split("x", 2);
+        if (hdmi_3_setting.src.equals("SNPE")) {
+            resolutions = pref.getString("hdmi_3_camera_size", "1280x720").split("x", 2);
+        } else {
+            resolutions = pref.getString("hdmi_3_camera_size", "1920x1080").split("x", 2);
+        }
 
         hdmi_3_setting.camWidth = Integer.parseInt(resolutions[0]);
         hdmi_3_setting.camHeight = Integer.parseInt(resolutions[1]);
@@ -212,6 +229,7 @@ public class SettingsUtil {
             Log.d(TAG, "Camera ID : " + data.get(it).camID);
             Log.d(TAG, "Camera width : " + data.get(it).camWidth);
             Log.d(TAG, "Camera height : " + data.get(it).camHeight);
+            Log.d(TAG, "SNPE Runtime : " + data.get(it).snpeRuntime);
             Log.d(TAG, "Is HDMIin Camera Enabled : " + data.get(it).isHDMIinCameraEnabled);
             Log.d(TAG, "Is HDMIin Audio Enabled : " + data.get(it).isHDMIinAudioEnabled);
             Log.d(TAG, "Is HDMIin Video Enabled : " + data.get(it).isHDMIinVideoEnabled);
@@ -242,6 +260,10 @@ public class SettingsUtil {
 
     public int getCameraHeight(int index) {
         return data.get(index).camHeight;
+    }
+
+    public String getSnpeRuntime(int index) {
+        return data.get(index).snpeRuntime;
     }
 
     public Boolean getIsHDMIinCameraEnabled(int index) {

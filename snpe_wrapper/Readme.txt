@@ -1,9 +1,13 @@
 
-Enable SNPE wrapper compilation steps
+Enable AI Director and SNPE wrapper compilation steps
 
-1. Uncomment below lines in snpe_wrapper/Android.mk and iot-media-system.mk
+1. In Android.mk of iot-media and iot-media-system.mk uncomment below lines:
 
-# SNPE_WRAPPER_COMPILATION := true
+# AI_DIRECTOR := true
+
+Note: In snpe_wrapper/Android.mk, set the SNPE_SDK variable to the snpe version used.
+      Below is the default value set.
+
 # SNPE_SDK := snpe-1.55.0.2958
 
 2. Extract SNPE SDK archive in snpe_lib/

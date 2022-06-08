@@ -1,6 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(SNPE_WRAPPER_COMPILATION),true)
+ifeq ($(AI_DIRECTOR),true)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libSNPE

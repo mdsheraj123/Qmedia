@@ -1,7 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-# SNPE_WRAPPER_COMPILATION := true
-# SNPE_SDK := snpe-1.55.0.2958
+SNPE_SDK := snpe-1.55.0.2958
 
 include $(CLEAR_VARS)
 
@@ -18,7 +17,7 @@ LOCAL_SHARED_LIBRARIES := \
   libcutils \
   liblog
 
-ifeq ($(SNPE_WRAPPER_COMPILATION),true)
+ifeq ($(AI_DIRECTOR),true)
   LOCAL_SRC_FILES := snpe_wrapper.cc
   LOCAL_C_INCLUDES += $(LOCAL_PATH)/snpe_lib/$(SNPE_SDK)/include/zdl
 

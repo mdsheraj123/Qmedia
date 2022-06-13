@@ -98,11 +98,18 @@
             android:title="Camera ID" />
 
         <androidx.preference.ListPreference
-            android:defaultValue="1920x1080"
             android:entries="@array/camera_resolutions"
             android:entryValues="@array/camera_resolutions"
             android:key="hdmi_1_camera_size"
-            android:title="Camera resolution"/>
+            android:title="Camera resolution" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="DSP"
+            android:entries="@array/snpe_runtime"
+            android:entryValues="@array/snpe_runtime"
+            android:key="hdmi_1_snpe_runtime"
+            android:summary="%s"
+            android:title="SNPE Runtime" />
 
         <androidx.preference.SwitchPreference
             android:defaultValue="false"
@@ -156,11 +163,18 @@
             android:title="Camera ID" />
 
         <androidx.preference.ListPreference
-            android:defaultValue="1920x1080"
             android:entries="@array/camera_resolutions"
             android:entryValues="@array/camera_resolutions"
             android:key="hdmi_2_camera_size"
-            android:title="Camera resolution"/>
+            android:title="Camera resolution" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="DSP"
+            android:entries="@array/snpe_runtime"
+            android:entryValues="@array/snpe_runtime"
+            android:key="hdmi_2_snpe_runtime"
+            android:summary="%s"
+            android:title="SNPE Runtime" />
 
         <androidx.preference.SwitchPreference
             android:defaultValue="false"
@@ -214,11 +228,18 @@
             android:title="Camera ID" />
 
         <androidx.preference.ListPreference
-            android:defaultValue="1920x1080"
             android:entries="@array/camera_resolutions"
             android:entryValues="@array/camera_resolutions"
             android:key="hdmi_3_camera_size"
-            android:title="Camera resolution"/>
+            android:title="Camera resolution" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="DSP"
+            android:entries="@array/snpe_runtime"
+            android:entryValues="@array/snpe_runtime"
+            android:key="hdmi_3_snpe_runtime"
+            android:summary="%s"
+            android:title="SNPE Runtime" />
 
         <androidx.preference.SwitchPreference
             android:defaultValue="false"

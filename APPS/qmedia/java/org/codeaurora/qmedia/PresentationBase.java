@@ -116,11 +116,13 @@ public class PresentationBase extends Presentation implements CameraDisconnected
     private Boolean mCameraRunningStateSelected = false;
     private Boolean mRecorderStarted = false;
     private final AtomicBoolean mCameraRunning = new AtomicBoolean(false);
+    private final AtomicBoolean mSnpeRunning = new AtomicBoolean(false);
     private HandlerThread mAvailabilityCallbackThread;
     private Handler mAvailabilityCallbackHandler;
     private String mHDMIinCameraID = "";
     private final CameraDisconnectedListener mCameraDisconnectedListenerObject;
     private final Activity mActivity;
+    //private SnpeBase mSnpeBase = null;
 
     public PresentationBase(Context outerContext, Display display, SettingsUtil data, int index, Activity activity) {
         super(outerContext, display);
@@ -171,11 +173,14 @@ public class PresentationBase extends Presentation implements CameraDisconnected
             setContentView(R.layout.reproc_use_case);
             mReprocButton = findViewById(R.id.reproc_button);
             mReprocButton.setVisibility(View.INVISIBLE);
-        }
-        else {
+        } else if (mData.getHDMISource(mPresentationIndex).equals("SNPE")) {
+            setContentView(R.layout.secondary_display_ml);
+        } else {
             // Load Default layout for Camera
             setContentView(R.layout.secondary_display);
         }
+
+
         if (mData.getHDMISource(mPresentationIndex).equals("Camera")) {
             if (mData.getIsReprocEnabled(mPresentationIndex)) {
                 mImageView = findViewById(R.id.imageview0);
@@ -186,17 +191,19 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                     surface.getHolder().addCallback(new SurfaceHolder.Callback() {
                         @Override
                         public void surfaceCreated(SurfaceHolder holder) {
-                            holder.setFixedSize(1920,1080);
+                            holder.setFixedSize(1920, 1080);
                             holder.setFormat(ImageFormat.YUV_420_888);
                             createReprocStream();
                         }
 
                         @Override
                         public void surfaceChanged(SurfaceHolder holder, int format, int width,
-                                                   int height) { }
+                                                   int height) {
+                        }
 
                         @Override
-                        public void surfaceDestroyed(SurfaceHolder holder) { }
+                        public void surfaceDestroyed(SurfaceHolder holder) {
+                        }
                     });
                 }
             } else {
@@ -233,6 +240,11 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                     }
                 });
             }
+        } else if (mData.getHDMISource(mPresentationIndex).equals("SNPE")) {
+            //mSnpeBase = new SnpeBase(mActivity, mData.getSnpeRuntime(mPresentationIndex),
+            //        mData.getCameraWidth(mPresentationIndex), mData.getCameraHeight(mPresentationIndex));
+            //mSnpeBase.addPreviewImageView(findViewById(R.id.outputBitmap));
+
         } else if (mData.getHDMISource(mPresentationIndex).equals("MP4")) {
             if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode")) {
                 Log.d(TAG, "OpenGLES with Encode is selected");
@@ -409,6 +421,9 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                     }
                 }
             }
+            //if (mSnpeBase != null && !mSnpeRunning.getAndSet(true)) {
+            //    mSnpeBase.startInference(mData.getCameraID(mPresentationIndex));
+            //}
         }
         Log.v(TAG, "Starting secondary display Exit");
     }
@@ -452,6 +467,9 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                     mCameraBase.stopCamera();
                 }
             }
+            //if (mSnpeBase != null && mSnpeRunning.getAndSet(false)) {
+            //    mSnpeBase.stopInference();
+            //}
         }
         Log.v(TAG, "Stopping secondary display Exit");
     }

@@ -1,0 +1,286 @@
+From 8f5098482c2d24c52687b34ab00446a2cf287f00 Mon Sep 17 00:00:00 2001
+From: Mohammad Sheraj <quic_msheraj@quicinc.com>
+Date: Tue, 31 May 2022 09:05:29 +0100
+Subject: [PATCH] qmedia: AOSP Compilation patch of SNPE sdk selfie
+ segmentation
+
+- Apply this patch on top of 4118110.
+- Follow README.txt.
+
+Change-Id: I4d156160ff3021eaffd3b961cdecd96280673411
+---
+ APPS/qmedia/Android.mk                             | 65 ++++++++++++++++++++++
+ .../org/codeaurora/qmedia/PresentationBase.java    | 20 +++----
+ .../codeaurora/qmedia/fragments/HomeFragment.java  | 54 +++++++++---------
+ APPS/qmedia/proguard-project.txt                   | 10 ++++
+ 4 files changed, 112 insertions(+), 37 deletions(-)
+ create mode 100644 APPS/qmedia/proguard-project.txt
+
+diff --git a/APPS/qmedia/Android.mk b/APPS/qmedia/Android.mk
+index a3707f1..f105a7b 100644
+--- a/APPS/qmedia/Android.mk
++++ b/APPS/qmedia/Android.mk
+@@ -1,5 +1,47 @@
+ LOCAL_PATH := $(call my-dir)
+ 
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libsnpe-android
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES := libsnpe-android.so
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libSNPE
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES := libSNPE.so
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libc++_shared
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES := libc++_shared.so
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libsnpe_dsp_domains_v2
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES := libsnpe_dsp_domains_v2.so
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libsnpe_dsp_domains_v3
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES := libsnpe_dsp_domains_v3.so
++include $(BUILD_PREBUILT)
++
++
+ include $(CLEAR_VARS)
+ 
+ res_dir := res $(LOCAL_PATH)/res
+@@ -15,6 +57,9 @@ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/MediaCodecRecorder.java
+ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/PresentationBase.java
+ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/SettingsUtil.java
+ 
++LOCAL_SRC_FILES += java/org/codeaurora/qmedia/RenderScriptProcessing.java
++LOCAL_SRC_FILES += java/org/codeaurora/qmedia/SnpeBase.java
++
+ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/fragments/HomeFragment.java
+ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/fragments/PermissionFragment.java
+ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/fragments/SettingsFragment.java
+@@ -23,11 +68,16 @@ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/opengles/InputComposerSurface.java
+ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/opengles/OutputComposerSurface.java
+ LOCAL_SRC_FILES += java/org/codeaurora/qmedia/opengles/VideoComposer.java
+ 
++LOCAL_SRC_FILES += rs/preProcess.rs
++LOCAL_SRC_FILES += rs/postProcess.rs
++
+ LOCAL_RESOURCE_DIR := $(addprefix $(LOCAL_PATH)/, $(res_dir))
+ LOCAL_USE_AAPT2 := true
+ 
+ LOCAL_JAVA_LIBRARIES := com.google.android.material_material \
+ 
++LOCAL_STATIC_JAVA_LIBRARIES += snpe-release
++
+ LOCAL_STATIC_ANDROID_LIBRARIES := \
+         androidx.appcompat_appcompat \
+         androidx-constraintlayout_constraintlayout \
+@@ -35,9 +85,24 @@ LOCAL_STATIC_ANDROID_LIBRARIES := \
+         androidx.fragment_fragment \
+         androidx.core_core \
+ 
++LOCAL_REQUIRED_MODULES := \
++        libsnpe-android \
++        libSNPE \
++        libc++_shared \
++        libsnpe_dsp_domains_v2 \
++        libsnpe_dsp_domains_v3 \
++
+ LOCAL_CERTIFICATE := platform
+ LOCAL_PRIVILEGED_MODULE := true
+ LOCAL_PACKAGE_NAME := QMedia
+ LOCAL_PRIVATE_PLATFORM_APIS := true
+ 
++LOCAL_RENDERSCRIPT_TARGET_API := 21
++LOCAL_PROGUARD_FLAG_FILES   := proguard-project.txt
++
+ include $(BUILD_PACKAGE)
++
++
++include $(CLEAR_VARS)
++LOCAL_PREBUILT_STATIC_JAVA_LIBRARIES += snpe-release:libs/snpe-release.aar
++include $(BUILD_MULTI_PREBUILT)
+diff --git a/APPS/qmedia/java/org/codeaurora/qmedia/PresentationBase.java b/APPS/qmedia/java/org/codeaurora/qmedia/PresentationBase.java
+index efb0c86..ad28911 100644
+--- a/APPS/qmedia/java/org/codeaurora/qmedia/PresentationBase.java
++++ b/APPS/qmedia/java/org/codeaurora/qmedia/PresentationBase.java
+@@ -122,7 +122,7 @@ public class PresentationBase extends Presentation implements CameraDisconnected
+     private String mHDMIinCameraID = "";
+     private final CameraDisconnectedListener mCameraDisconnectedListenerObject;
+     private final Activity mActivity;
+-    //private SnpeBase mSnpeBase = null;
++    private SnpeBase mSnpeBase = null;
+ 
+     public PresentationBase(Context outerContext, Display display, SettingsUtil data, int index, Activity activity) {
+         super(outerContext, display);
+@@ -241,9 +241,9 @@ public class PresentationBase extends Presentation implements CameraDisconnected
+                 });
+             }
+         } else if (mData.getHDMISource(mPresentationIndex).equals("SNPE")) {
+-            //mSnpeBase = new SnpeBase(mActivity, mData.getSnpeRuntime(mPresentationIndex),
+-            //        mData.getCameraWidth(mPresentationIndex), mData.getCameraHeight(mPresentationIndex));
+-            //mSnpeBase.addPreviewImageView(findViewById(R.id.outputBitmap));
++            mSnpeBase = new SnpeBase(mActivity, mData.getSnpeRuntime(mPresentationIndex),
++                    mData.getCameraWidth(mPresentationIndex), mData.getCameraHeight(mPresentationIndex));
++            mSnpeBase.addPreviewImageView(findViewById(R.id.outputBitmap));
+ 
+         } else if (mData.getHDMISource(mPresentationIndex).equals("MP4")) {
+             if (mData.getComposeType(mPresentationIndex).equals("OpenGLESWithEncode")) {
+@@ -421,9 +421,9 @@ public class PresentationBase extends Presentation implements CameraDisconnected
+                     }
+                 }
+             }
+-            //if (mSnpeBase != null && !mSnpeRunning.getAndSet(true)) {
+-            //    mSnpeBase.startInference(mData.getCameraID(mPresentationIndex));
+-            //}
++            if (mSnpeBase != null && !mSnpeRunning.getAndSet(true)) {
++                mSnpeBase.startInference(mData.getCameraID(mPresentationIndex));
++            }
+         }
+         Log.v(TAG, "Starting secondary display Exit");
+     }
+@@ -467,9 +467,9 @@ public class PresentationBase extends Presentation implements CameraDisconnected
+                     mCameraBase.stopCamera();
+                 }
+             }
+-            //if (mSnpeBase != null && mSnpeRunning.getAndSet(false)) {
+-            //    mSnpeBase.stopInference();
+-            //}
++            if (mSnpeBase != null && mSnpeRunning.getAndSet(false)) {
++                mSnpeBase.stopInference();
++            }
+         }
+         Log.v(TAG, "Stopping secondary display Exit");
+     }
+diff --git a/APPS/qmedia/java/org/codeaurora/qmedia/fragments/HomeFragment.java b/APPS/qmedia/java/org/codeaurora/qmedia/fragments/HomeFragment.java
+index 0b00d16..72cf320 100644
+--- a/APPS/qmedia/java/org/codeaurora/qmedia/fragments/HomeFragment.java
++++ b/APPS/qmedia/java/org/codeaurora/qmedia/fragments/HomeFragment.java
+@@ -97,7 +97,7 @@ import org.codeaurora.qmedia.MediaCodecRecorder;
+ import org.codeaurora.qmedia.PresentationBase;
+ import org.codeaurora.qmedia.R;
+ import org.codeaurora.qmedia.SettingsUtil;
+-//import org.codeaurora.qmedia.SnpeBase;
++import org.codeaurora.qmedia.SnpeBase;
+ import org.codeaurora.qmedia.opengles.VideoComposer;
+ 
+ import java.io.File;
+@@ -137,7 +137,7 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
+     private HandlerThread mAvailabilityCallbackThread;
+     private Handler mAvailabilityCallbackHandler;
+     private String mHDMIinCameraID = "";
+-    //private SnpeBase mSnpeBase = null;
++    private SnpeBase mSnpeBase = null;
+ 
+     @Override
+     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
+@@ -275,9 +275,9 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
+                 }
+                 mCameraBase.stopCamera();
+             }
+-            //if (mSnpeBase != null && mSnpeRunning.getAndSet(false)) {
+-            //    mSnpeBase.stopInference();
+-            //}
++            if (mSnpeBase != null && mSnpeRunning.getAndSet(false)) {
++                mSnpeBase.stopInference();
++            }
+         }
+         for (PresentationBase it : mPresentationBaseList) {
+             it.dismiss();
+@@ -388,25 +388,25 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
+     private void processSnpeAndSecondaryDisplaysToggle() {
+         Log.v(TAG, "processSnpeAndSecondaryDisplaysToggle enter");
+         mPrimaryDisplayStarted = !mPrimaryDisplayStarted;
+-        //if (mSnpeBase != null) {
+-        //    if (mPrimaryDisplayStarted) {
+-        //        if (!mSnpeRunning.getAndSet(true)) {
+-        //            mSnpeBase.startInference(mSettingData.getCameraID(0));
+-        //        }
+-        //        for (PresentationBase it : mPresentationBaseList) {
+-        //            it.start();
+-        //        }
+-        //        mPrimaryDisplayButton.setText("Stop");
+-        //    } else {
+-        //        if (mSnpeRunning.getAndSet(false)) {
+-        //            mSnpeBase.stopInference();
+-        //        }
+-        //        for (PresentationBase it : mPresentationBaseList) {
+-        //            it.stop();
+-        //        }
+-        //        mPrimaryDisplayButton.setText("Start");
+-        //    }
+-        //}
++        if (mSnpeBase != null) {
++            if (mPrimaryDisplayStarted) {
++                if (!mSnpeRunning.getAndSet(true)) {
++                    mSnpeBase.startInference(mSettingData.getCameraID(0));
++                }
++                for (PresentationBase it : mPresentationBaseList) {
++                    it.start();
++                }
++                mPrimaryDisplayButton.setText("Stop");
++            } else {
++                if (mSnpeRunning.getAndSet(false)) {
++                    mSnpeBase.stopInference();
++                }
++                for (PresentationBase it : mPresentationBaseList) {
++                    it.stop();
++                }
++                mPrimaryDisplayButton.setText("Start");
++            }
++        }
+         Log.v(TAG, "processSnpeAndSecondaryDisplaysToggle exit");
+     }
+ 
+@@ -616,9 +616,9 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
+ 
+     private void handleSnpe(View view) {
+         Log.v(TAG, "handleSnpe enter");
+-        //mSnpeBase = new SnpeBase(requireActivity(), mSettingData.getSnpeRuntime(0),
+-        //        mSettingData.getCameraWidth(0), mSettingData.getCameraHeight(0));
+-        //mSnpeBase.addPreviewImageView(view.findViewById(R.id.outputBitmap));
++        mSnpeBase = new SnpeBase(requireActivity(), mSettingData.getSnpeRuntime(0),
++                mSettingData.getCameraWidth(0), mSettingData.getCameraHeight(0));
++        mSnpeBase.addPreviewImageView(view.findViewById(R.id.outputBitmap));
+ 
+         mPrimaryDisplayButton = view.findViewById(R.id.primary_display_button);
+         mPrimaryDisplayButton
+diff --git a/APPS/qmedia/proguard-project.txt b/APPS/qmedia/proguard-project.txt
+new file mode 100644
+index 0000000..9e06a3e
+--- /dev/null
++++ b/APPS/qmedia/proguard-project.txt
+@@ -0,0 +1,10 @@
++-keepclasseswithmembernames class * {
++    native <methods>;
++}
++
++-keep class * {
++    public <methods>;
++    public <fields>;
++    private <methods>;
++    private <fields>;
++}
+-- 
+2.7.4
+

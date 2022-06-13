@@ -151,6 +151,7 @@ public class CameraBase {
     private int mFrameCount = 0;
     private long mInitialTime;
     private Range<Integer> mFPSRange = new Range(30, 30);
+    private ArrayList<Surface> mMLImageSurfaceList = new ArrayList<>();
 
     public CameraBase(Context context, CameraDisconnectedListener cameraDisconnectedListener) {
         mCameraContext = context;
@@ -216,7 +217,9 @@ public class CameraBase {
         @Override
         public void onDisconnected(CameraDevice cameraDevice) {
             Log.v(TAG, "onDisconnected Called for camera # " + cameraDevice.getId());
-            mCameraDisconnectedListener.cameraDisconnected();
+            if (mCameraDisconnectedListener != null) {
+                mCameraDisconnectedListener.cameraDisconnected();
+            }
         }
 
         @Override
@@ -450,6 +453,12 @@ public class CameraBase {
                 mPreviewRequestBuilder.addTarget(mRecordSurface);
                 outputs.add(mRecordSurface);
             }
+            if (!mMLImageSurfaceList.isEmpty()) {
+                for (Surface surface : mMLImageSurfaceList) {
+                    mPreviewRequestBuilder.addTarget(surface);
+                    outputs.add(surface);
+                }
+            }
             if (!mSurfaceViewList.isEmpty()) {
                 for (SurfaceView view : mSurfaceViewList) {
                     outputs.add(view.getHolder().getSurface());
@@ -468,7 +477,7 @@ public class CameraBase {
 
             sessionCfg.setSessionParameters(mPreviewRequestBuilder.build());
             if (mEnableReproc) {
-                InputConfiguration inputConfig = new InputConfiguration(3840,2160,
+                InputConfiguration inputConfig = new InputConfiguration(3840, 2160,
                         ImageFormat.YUV_420_888);
                 sessionCfg.setInputConfiguration(inputConfig);
             }
@@ -498,6 +507,10 @@ public class CameraBase {
     public void addRecorderStream(Surface recorderSurface) {
         mRecordSurface = recorderSurface;
         mRecord = true;
+    }
+
+    public void addMLImageSurface(Surface surface) {
+        mMLImageSurfaceList.add(surface);
     }
 
     class CameraReprocThread extends Thread {

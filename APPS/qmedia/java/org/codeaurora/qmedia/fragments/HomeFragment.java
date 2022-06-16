@@ -97,6 +97,7 @@ import org.codeaurora.qmedia.MediaCodecRecorder;
 import org.codeaurora.qmedia.PresentationBase;
 import org.codeaurora.qmedia.R;
 import org.codeaurora.qmedia.SettingsUtil;
+//import org.codeaurora.qmedia.SnpeBase;
 import org.codeaurora.qmedia.opengles.VideoComposer;
 
 import java.io.File;
@@ -131,10 +132,12 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
     private Boolean mCameraRunningStateSelected = false;
     private Context mContext;
     private final AtomicBoolean mCameraRunning = new AtomicBoolean(false);
+    private final AtomicBoolean mSnpeRunning = new AtomicBoolean(false);
     private CameraDisconnectedListener mCameraDisconnectedListenerObject;
     private HandlerThread mAvailabilityCallbackThread;
     private Handler mAvailabilityCallbackHandler;
     private String mHDMIinCameraID = "";
+    //private SnpeBase mSnpeBase = null;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -144,9 +147,9 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
         mCameraDisconnectedListenerObject = this;
         startAvailabilityCallbackThread();
         // Inflate the layout for this fragment
-        mSettingData = new SettingsUtil(getActivity().getApplicationContext());
+        mSettingData = new SettingsUtil(requireActivity().getApplicationContext());
         mSettingData.printSettingsValues();
-        mDisplayManager = (DisplayManager) getActivity().getSystemService(Context.DISPLAY_SERVICE);
+        mDisplayManager = (DisplayManager) requireActivity().getSystemService(Context.DISPLAY_SERVICE);
 
         // This code is to handle Concurrent Decode functionality
         if (mSettingData.getHDMISource(0).equals("MP4")) {
@@ -168,13 +171,15 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                         return inflater.inflate(R.layout.decode_max, container, false);
                     default:
                         Log.e(TAG, "Invalid decode configuration");
-                        Toast.makeText(getActivity().getApplicationContext(),
+                        Toast.makeText(requireActivity().getApplicationContext(),
                                 "Invalid Decode configuration", Toast.LENGTH_SHORT).show();
                 }
             }
         } else if (mSettingData.getHDMISource(0).equals("Camera") &&
                 mSettingData.getIsReprocEnabled(0)) { // This is to handle reproc use case
             return inflater.inflate(R.layout.reproc_use_case, container, false);
+        } else if (mSettingData.getHDMISource(0).equals("SNPE")) {
+            return inflater.inflate(R.layout.primary_display_ml, container, false);
         }
 
         // Load Default layout for all other scenario e.g. HDMI In and Concurrent HDMI
@@ -194,6 +199,8 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
             } else {
                 handleCamera(view);
             }
+        } else if (mSettingData.getHDMISource(0).equals("SNPE")) {
+            handleSnpe(view);
         } else {
             if (mSettingData.getHDMISource(1).equals("None") &&
                     mSettingData.getHDMISource(2).equals("None")) {
@@ -268,6 +275,9 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                 }
                 mCameraBase.stopCamera();
             }
+            //if (mSnpeBase != null && mSnpeRunning.getAndSet(false)) {
+            //    mSnpeBase.stopInference();
+            //}
         }
         for (PresentationBase it : mPresentationBaseList) {
             it.dismiss();
@@ -373,6 +383,31 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
             }
         }
         Log.v(TAG, "processCameraAndSecondaryDisplaysToggle exit");
+    }
+
+    private void processSnpeAndSecondaryDisplaysToggle() {
+        Log.v(TAG, "processSnpeAndSecondaryDisplaysToggle enter");
+        mPrimaryDisplayStarted = !mPrimaryDisplayStarted;
+        //if (mSnpeBase != null) {
+        //    if (mPrimaryDisplayStarted) {
+        //        if (!mSnpeRunning.getAndSet(true)) {
+        //            mSnpeBase.startInference(mSettingData.getCameraID(0));
+        //        }
+        //        for (PresentationBase it : mPresentationBaseList) {
+        //            it.start();
+        //        }
+        //        mPrimaryDisplayButton.setText("Stop");
+        //    } else {
+        //        if (mSnpeRunning.getAndSet(false)) {
+        //            mSnpeBase.stopInference();
+        //        }
+        //        for (PresentationBase it : mPresentationBaseList) {
+        //            it.stop();
+        //        }
+        //        mPrimaryDisplayButton.setText("Start");
+        //    }
+        //}
+        Log.v(TAG, "processSnpeAndSecondaryDisplaysToggle exit");
     }
 
 
@@ -511,17 +546,19 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
             surface.getHolder().addCallback(new SurfaceHolder.Callback() {
                 @Override
                 public void surfaceCreated(SurfaceHolder holder) {
-                    holder.setFixedSize(1920,1080);
+                    holder.setFixedSize(1920, 1080);
                     holder.setFormat(ImageFormat.YUV_420_888);
                     createReprocStream();
                 }
 
                 @Override
                 public void surfaceChanged(SurfaceHolder holder, int format, int width,
-                                           int height) { }
+                                           int height) {
+                }
 
                 @Override
-                public void surfaceDestroyed(SurfaceHolder holder) { }
+                public void surfaceDestroyed(SurfaceHolder holder) {
+                }
             });
         }
         Log.v(TAG, "handleCameraAndReproc exit");
@@ -558,7 +595,11 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                 } else {
                     mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
                     mCameraBase.addPreviewStream(holder);
-                    holder.setFixedSize(1920, 1080);
+
+                    int width = mSettingData.getCameraWidth(0);
+                    int height = mSettingData.getCameraHeight(0);
+
+                    holder.setFixedSize(width, height);
                 }
             }
 
@@ -571,6 +612,18 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
             }
         });
         Log.v(TAG, "handleCamera exit");
+    }
+
+    private void handleSnpe(View view) {
+        Log.v(TAG, "handleSnpe enter");
+        //mSnpeBase = new SnpeBase(requireActivity(), mSettingData.getSnpeRuntime(0),
+        //        mSettingData.getCameraWidth(0), mSettingData.getCameraHeight(0));
+        //mSnpeBase.addPreviewImageView(view.findViewById(R.id.outputBitmap));
+
+        mPrimaryDisplayButton = view.findViewById(R.id.primary_display_button);
+        mPrimaryDisplayButton
+                .setOnClickListener((View v) -> processSnpeAndSecondaryDisplaysToggle());
+        Log.v(TAG, "handleSnpe exit");
     }
 
     private void handleDecode(View view) {

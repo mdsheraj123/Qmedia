@@ -97,6 +97,20 @@
             android:summary="%s"
             android:title="Camera ID" />
 
+        <androidx.preference.ListPreference
+            android:entries="@array/camera_resolutions"
+            android:entryValues="@array/camera_resolutions"
+            android:key="hdmi_1_camera_size"
+            android:title="Camera resolution" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="DSP"
+            android:entries="@array/snpe_runtime"
+            android:entryValues="@array/snpe_runtime"
+            android:key="hdmi_1_snpe_runtime"
+            android:summary="%s"
+            android:title="SNPE Runtime" />
+
         <androidx.preference.SwitchPreference
             android:defaultValue="false"
             android:key="hdmi_1_hdmi_in_audio_enable"
@@ -148,6 +162,20 @@
             android:summary="%s"
             android:title="Camera ID" />
 
+        <androidx.preference.ListPreference
+            android:entries="@array/camera_resolutions"
+            android:entryValues="@array/camera_resolutions"
+            android:key="hdmi_2_camera_size"
+            android:title="Camera resolution" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="DSP"
+            android:entries="@array/snpe_runtime"
+            android:entryValues="@array/snpe_runtime"
+            android:key="hdmi_2_snpe_runtime"
+            android:summary="%s"
+            android:title="SNPE Runtime" />
+
         <androidx.preference.SwitchPreference
             android:defaultValue="false"
             android:key="hdmi_2_hdmi_in_audio_enable"
@@ -198,6 +226,20 @@
             android:key="hdmi_3_camera_id"
             android:summary="%s"
             android:title="Camera ID" />
+
+        <androidx.preference.ListPreference
+            android:entries="@array/camera_resolutions"
+            android:entryValues="@array/camera_resolutions"
+            android:key="hdmi_3_camera_size"
+            android:title="Camera resolution" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="DSP"
+            android:entries="@array/snpe_runtime"
+            android:entryValues="@array/snpe_runtime"
+            android:key="hdmi_3_snpe_runtime"
+            android:summary="%s"
+            android:title="SNPE Runtime" />
 
         <androidx.preference.SwitchPreference
             android:defaultValue="false"

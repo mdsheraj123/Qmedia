@@ -152,7 +152,6 @@ public class SettingsFragment extends PreferenceFragmentCompat
         if (navHeight > 0) {
             view.setPadding(0, 0, 0, navHeight);
         }
-
     }
 
     @Override
@@ -177,6 +176,8 @@ public class SettingsFragment extends PreferenceFragmentCompat
         ListPreference decoder_instance = mPrefScreen.findPreference("hdmi_1_decoder_instance");
         ListPreference compose_view = mPrefScreen.findPreference("hdmi_1_compose_view");
         ListPreference camera_id = mPrefScreen.findPreference("hdmi_1_camera_id");
+        ListPreference camera_size = mPrefScreen.findPreference("hdmi_1_camera_size");
+        ListPreference snpe_runtime = mPrefScreen.findPreference("hdmi_1_snpe_runtime");
         SwitchPreference hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_1_hdmi_in_audio_enable");
         SwitchPreference hdmiin_video_enable = mPrefScreen.findPreference("hdmi_1_hdmi_in_video_enable");
         SwitchPreference reproc_enable = mPrefScreen.findPreference("hdmi_1_reproc_enable");
@@ -191,6 +192,12 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (camera_id.isVisible()) {
                 camera_id.setVisible(false);
             }
+            if (camera_size.isVisible()) {
+                camera_size.setVisible(false);
+            }
+            if (snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(false);
+            }
             if (hdmiin_audio_enable.isVisible()) {
                 hdmiin_audio_enable.setVisible(false);
             }
@@ -210,28 +217,62 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (!camera_id.isVisible()) {
                 camera_id.setVisible(true);
             }
+            if (snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(false);
+            }
             if (camera_id.getValue().equals(mHDMIinCameraID)) {
                 hdmiin_audio_enable.setVisible(true);
                 hdmiin_video_enable.setVisible(true);
                 reproc_enable.setVisible(false);
+                camera_size.setVisible(false);
             } else {
                 hdmiin_audio_enable.setVisible(false);
                 hdmiin_video_enable.setVisible(false);
                 reproc_enable.setVisible(true);
+                camera_size.setVisible(true);
+            }
+        } else if (hdmi_source.getValue().equals("SNPE")) {
+            if (decoder_instance.isVisible()) {
+                decoder_instance.setVisible(false);
+            }
+            if (compose_view.isVisible()) {
+                compose_view.setVisible(false);
+            }
+            if (!camera_id.isVisible()) {
+                camera_id.setVisible(true);
+            }
+            if (!camera_size.isVisible()) {
+                camera_size.setVisible(true);
+            }
+            if (!snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(true);
+            }
+            if (hdmiin_audio_enable.isVisible()) {
+                hdmiin_audio_enable.setVisible(false);
+            }
+            if (hdmiin_video_enable.isVisible()) {
+                hdmiin_video_enable.setVisible(false);
+            }
+            if (reproc_enable.isVisible()) {
+                reproc_enable.setVisible(false);
             }
         } else {
             decoder_instance.setVisible(false);
             compose_view.setVisible(false);
             camera_id.setVisible(false);
+            camera_size.setVisible(false);
             hdmiin_audio_enable.setVisible(false);
             hdmiin_video_enable.setVisible(false);
             reproc_enable.setVisible(false);
+            snpe_runtime.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_2_source");
         decoder_instance = mPrefScreen.findPreference("hdmi_2_decoder_instance");
         compose_view = mPrefScreen.findPreference("hdmi_2_compose_view");
         camera_id = mPrefScreen.findPreference("hdmi_2_camera_id");
+        camera_size = mPrefScreen.findPreference("hdmi_2_camera_size");
+        snpe_runtime = mPrefScreen.findPreference("hdmi_2_snpe_runtime");
         hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_2_hdmi_in_audio_enable");
         hdmiin_video_enable = mPrefScreen.findPreference("hdmi_2_hdmi_in_video_enable");
         reproc_enable = mPrefScreen.findPreference("hdmi_2_reproc_enable");
@@ -246,6 +287,12 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (camera_id.isVisible()) {
                 camera_id.setVisible(false);
             }
+            if (camera_size.isVisible()) {
+                camera_size.setVisible(false);
+            }
+            if (snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(false);
+            }
             if (hdmiin_audio_enable.isVisible()) {
                 hdmiin_audio_enable.setVisible(false);
             }
@@ -265,14 +312,44 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (!camera_id.isVisible()) {
                 camera_id.setVisible(true);
             }
+            if (snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(false);
+            }
             if (camera_id.getValue().equals(mHDMIinCameraID)) {
                 hdmiin_audio_enable.setVisible(true);
                 hdmiin_video_enable.setVisible(true);
                 reproc_enable.setVisible(false);
+                camera_size.setVisible(false);
             } else {
                 hdmiin_audio_enable.setVisible(false);
                 hdmiin_video_enable.setVisible(false);
                 reproc_enable.setVisible(true);
+                camera_size.setVisible(true);
+            }
+        } else if (hdmi_source.getValue().equals("SNPE")) {
+            if (decoder_instance.isVisible()) {
+                decoder_instance.setVisible(false);
+            }
+            if (compose_view.isVisible()) {
+                compose_view.setVisible(false);
+            }
+            if (!camera_id.isVisible()) {
+                camera_id.setVisible(true);
+            }
+            if (!camera_size.isVisible()) {
+                camera_size.setVisible(true);
+            }
+            if (!snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(true);
+            }
+            if (hdmiin_audio_enable.isVisible()) {
+                hdmiin_audio_enable.setVisible(false);
+            }
+            if (hdmiin_video_enable.isVisible()) {
+                hdmiin_video_enable.setVisible(false);
+            }
+            if (reproc_enable.isVisible()) {
+                reproc_enable.setVisible(false);
             }
         } else {
             decoder_instance.setVisible(false);
@@ -281,12 +358,16 @@ public class SettingsFragment extends PreferenceFragmentCompat
             hdmiin_audio_enable.setVisible(false);
             hdmiin_video_enable.setVisible(false);
             reproc_enable.setVisible(false);
+            camera_size.setVisible(false);
+            snpe_runtime.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_3_source");
         decoder_instance = mPrefScreen.findPreference("hdmi_3_decoder_instance");
         compose_view = mPrefScreen.findPreference("hdmi_3_compose_view");
         camera_id = mPrefScreen.findPreference("hdmi_3_camera_id");
+        camera_size = mPrefScreen.findPreference("hdmi_3_camera_size");
+        snpe_runtime = mPrefScreen.findPreference("hdmi_3_snpe_runtime");
         hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_3_hdmi_in_audio_enable");
         hdmiin_video_enable = mPrefScreen.findPreference("hdmi_3_hdmi_in_video_enable");
         reproc_enable = mPrefScreen.findPreference("hdmi_3_reproc_enable");
@@ -301,6 +382,12 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (camera_id.isVisible()) {
                 camera_id.setVisible(false);
             }
+            if (camera_size.isVisible()) {
+                camera_size.setVisible(false);
+            }
+            if (snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(false);
+            }
             if (hdmiin_audio_enable.isVisible()) {
                 hdmiin_audio_enable.setVisible(false);
             }
@@ -320,14 +407,44 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (!camera_id.isVisible()) {
                 camera_id.setVisible(true);
             }
+            if (snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(false);
+            }
             if (camera_id.getValue().equals(mHDMIinCameraID)) {
                 hdmiin_audio_enable.setVisible(true);
                 hdmiin_video_enable.setVisible(true);
                 reproc_enable.setVisible(false);
+                camera_size.setVisible(false);
             } else {
                 hdmiin_audio_enable.setVisible(false);
                 hdmiin_video_enable.setVisible(false);
                 reproc_enable.setVisible(true);
+                camera_size.setVisible(true);
+            }
+        } else if (hdmi_source.getValue().equals("SNPE")) {
+            if (decoder_instance.isVisible()) {
+                decoder_instance.setVisible(false);
+            }
+            if (compose_view.isVisible()) {
+                compose_view.setVisible(false);
+            }
+            if (!camera_id.isVisible()) {
+                camera_id.setVisible(true);
+            }
+            if (!camera_size.isVisible()) {
+                camera_size.setVisible(true);
+            }
+            if (!snpe_runtime.isVisible()) {
+                snpe_runtime.setVisible(true);
+            }
+            if (hdmiin_audio_enable.isVisible()) {
+                hdmiin_audio_enable.setVisible(false);
+            }
+            if (hdmiin_video_enable.isVisible()) {
+                hdmiin_video_enable.setVisible(false);
+            }
+            if (reproc_enable.isVisible()) {
+                reproc_enable.setVisible(false);
             }
         } else {
             decoder_instance.setVisible(false);
@@ -336,6 +453,8 @@ public class SettingsFragment extends PreferenceFragmentCompat
             hdmiin_audio_enable.setVisible(false);
             hdmiin_video_enable.setVisible(false);
             reproc_enable.setVisible(false);
+            camera_size.setVisible(false);
+            snpe_runtime.setVisible(false);
         }
 
         // Handle Reset App Preference

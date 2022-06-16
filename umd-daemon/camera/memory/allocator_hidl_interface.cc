@@ -42,7 +42,8 @@ const std::unordered_map<int32_t, uint64_t> HidlAllocUsage::usage_flag_map_ = {
     {IMemAllocUsage::kHwTexture,        static_cast<uint64_t>(BufferUsage::GPU_TEXTURE)},
     {IMemAllocUsage::kHwComposer,       static_cast<uint64_t>(BufferUsage::COMPOSER_CURSOR)},
     {IMemAllocUsage::kHwCameraRead,     static_cast<uint64_t>(BufferUsage::CAMERA_INPUT)},
-    {IMemAllocUsage::kHwCameraWrite,    static_cast<uint64_t>(BufferUsage::CAMERA_OUTPUT)}};
+    {IMemAllocUsage::kHwCameraWrite,    static_cast<uint64_t>(BufferUsage::CAMERA_OUTPUT)},
+    {IMemAllocUsage::kHwRender,         static_cast<uint64_t>(BufferUsage::GPU_RENDER_TARGET)}};
 
 uint64_t HidlAllocUsage::ToLocal(int32_t common) const {
   uint64_t local_usage = 0;
@@ -78,7 +79,7 @@ MemAllocFlags HidlAllocUsage::ToCommon(uint64_t local) const {
 buffer_handle_t &HidlAllocBuffer::GetNativeHandle() { return native_handle_;}
 
 int HidlAllocBuffer::GetFD() {
-  return -1;
+  return native_handle_->data[0];
 }
 PixelFormat HidlAllocBuffer::GetFormat() {
   return format_;
@@ -101,7 +102,7 @@ MemAllocError HidlAllocDevice::AllocBuffer(IBufferHandle& handle, int32_t width,
                                            MemAllocFlags usage,
                                            uint32_t *stride) {
   assert(width && height);
-  int32_t consumer_usage = HidlAllocUsage().ToLocal(usage);
+  int32_t local_usage = HidlAllocUsage().ToLocal(usage);
 
   HidlAllocBuffer *buffer = new HidlAllocBuffer;
   handle = buffer;
@@ -115,8 +116,7 @@ MemAllocError HidlAllocDevice::AllocBuffer(IBufferHandle& handle, int32_t width,
   descriptor_info.format =
     static_cast<android::hardware::graphics::common::V1_2::PixelFormat>(format);
 
-  descriptor_info.usage = static_cast<uint64_t>(consumer_usage |
-      BufferUsage::CAMERA_OUTPUT);
+  descriptor_info.usage = static_cast<uint64_t>(local_usage);
 
   Return<void> ret = hidl_mapper_->createDescriptor(descriptor_info,
       [&descriptor](auto err, auto desc) {
@@ -191,8 +191,7 @@ MemAllocError HidlAllocDevice::MapBuffer(const IBufferHandle& handle,
   assert(b != nullptr);
 
   int32_t consumer_usage = HidlAllocUsage().ToLocal(usage);
-  auto local_usage = static_cast<uint64_t>(consumer_usage |
-                              BufferUsage::CAMERA_OUTPUT);
+  auto local_usage = static_cast<uint64_t>(consumer_usage);
   auto buffer = const_cast<native_handle_t*>(b->GetNativeHandle());
 
   hidl_handle fence_handle;
@@ -242,7 +241,8 @@ MemAllocError HidlAllocDevice::Perform(const IBufferHandle& handle,
       *static_cast<int32_t*>(result) = handle->GetStride();
       return MemAllocError::kAllocOk;
     case AllocDeviceAction::GetAlignedHeight:
-      *static_cast<int32_t*>(result) = 0; //TODO: Extract real aligned value
+      // Align to multiple of 64
+      *static_cast<int32_t*>(result) = (handle->GetHeight() + 0x3F) & (~0x3F);
       return MemAllocError::kAllocOk;
     case AllocDeviceAction::GetAlignedWidth:
       *static_cast<int32_t*>(result) = handle->GetStride();
